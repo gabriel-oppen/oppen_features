@@ -66,7 +66,3 @@ f_oppen_graficos_distribuicao <- function(dados,
   # gran finale
   cat("Você criou um total de", total_graficos, "gráficos lindos! Uhuuuuuul\n") 
 }
-
-  
-  
-}
