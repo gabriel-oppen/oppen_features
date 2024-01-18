@@ -1,3 +1,13 @@
+# Descrição do Código:
+# Este script cria  uma função chamada f_oppen_graficos_distribuicao que gera gráficos de densidade (cdf) e
+# funções de distribuição acumulada empíricas (ecdf) para um conjunto de dados. A função aceita um conjunto
+# de dados, uma lista de variáveis de resultado, uma variável indicadora de tratamento, um diretório para
+# salvar as imagens e parâmetros opcionais para personalizar os limites dos eixos y e x nos gráficos.
+# Caso a variável de tratamento não seja fornecida, o código gera gráficos para toda a amostra.
+# Os gráficos são salvos no diretório especificado e incluem distribuições de densidade e acumuladas para
+# cada variável de resultado.
+
+
 # Bibliotecas --------------------------------------------------------------------
 
 if(!require(tidyverse)) install.packages("tidyverse") # manipulação de dados
