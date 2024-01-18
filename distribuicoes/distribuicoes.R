@@ -57,4 +57,9 @@ f_oppen_graficos_distribuicao <- function(dados,
     ggsave(paste0(imagens_dir_final, "distribuicao_ecdf_", var, ".png"),
            plot = grafico_ecdf, width = 12.7, height = 6.7, units = "cm")
   }
+  
+  # gran finale
+  print("Vualá! você criou gráficos lindos! Uhuuuuuul")
+  
+  
 }
