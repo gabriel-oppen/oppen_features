@@ -14,7 +14,7 @@ if(!require(tidyverse)) install.packages("tidyverse") # manipulação de dados
 if(!require(ggplot2)) install.packages("ggplot2")     # gráficos
 
 # Definindo parâmetros
-f_oppen_graficos_distribuicao <- function(dados,
+suppressWarnings(f_oppen_graficos_distribuicao <- function(dados, # suppressWarnings para omitir warnings ao final
                                           vars_resultado,
                                           var_tratamento = NULL,
                                           imagens_dir = NULL,
@@ -62,4 +62,4 @@ f_oppen_graficos_distribuicao <- function(dados,
   print("Vualá! você criou gráficos lindos! Uhuuuuuul")
   
   
-}
+})
