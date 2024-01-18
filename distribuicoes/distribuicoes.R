@@ -14,7 +14,7 @@ if(!require(tidyverse)) install.packages("tidyverse") # manipulação de dados
 if(!require(ggplot2)) install.packages("ggplot2")     # gráficos
 
 # Definindo parâmetros
-suppressWarnings(f_oppen_graficos_distribuicao <- function(dados, # suppressWarnings para omitir warnings ao final
+f_oppen_graficos_distribuicao <- function(dados, 
                                           vars_resultado,
                                           var_tratamento = NULL,
                                           imagens_dir = NULL,
@@ -42,8 +42,8 @@ suppressWarnings(f_oppen_graficos_distribuicao <- function(dados, # suppressWarn
       coord_cartesian(ylim = ylim, xlim = xlim)
     
     # salvando
-    ggsave(paste0(imagens_dir_final, "distribuicao_cdf_", var, ".png"),
-           plot = grafico_cdf, width = 12.7, height = 6.7, units = "cm")
+    suppressWarnings(ggsave(paste0(imagens_dir_final, "distribuicao_cdf_", var, ".png"),
+           plot = grafico_cdf, width = 12.7, height = 6.7, units = "cm"))
     
     # empirical cumulative distribution function (ecdf)
     grafico_ecdf <- ggplot(dados, aes(x = !!as.name(var), color = var_tratamento_final)) +
@@ -54,12 +54,12 @@ suppressWarnings(f_oppen_graficos_distribuicao <- function(dados, # suppressWarn
       coord_cartesian(ylim = c(0,1), xlim = xlim)
 
     # salvando
-    ggsave(paste0(imagens_dir_final, "distribuicao_ecdf_", var, ".png"),
-           plot = grafico_ecdf, width = 12.7, height = 6.7, units = "cm")
+    suppressWarnings(ggsave(paste0(imagens_dir_final, "distribuicao_ecdf_", var, ".png"),
+           plot = grafico_ecdf, width = 12.7, height = 6.7, units = "cm"))
   }
   
   # gran finale
-  print("Vualá! você criou gráficos lindos! Uhuuuuuul")
+  print("Vualá! você criou gráficos lindos! Uhuuuuuul") 
   
   
-})
+}
