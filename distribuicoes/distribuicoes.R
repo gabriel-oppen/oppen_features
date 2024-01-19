@@ -17,6 +17,7 @@ f_oppen_graficos_distribuicao <- function(dados,
                                           vars_resultado,
                                           var_tratamento = NULL,
                                           imagens_dir = NULL,
+                                          titulo = NULL,
                                           ylim = c(),
                                           xlim = c()) {
   
@@ -24,12 +25,14 @@ f_oppen_graficos_distribuicao <- function(dados,
   total_graficos <- 0
   
   # Loop  
-  for (var in vars_resultado) {
+  for (i in seq_along(vars_resultado)) { # seq_along retorna um número que representa o total de elementos no vetor especificado
     
-    # Verifica se imagens_dir foi preenchida
+    var <- vars_resultado[i]
+    
+    # Verifica se variáveis opcionais foram preenchidas
     imagens_dir_final <- ifelse(is.null(imagens_dir), "", imagens_dir)
+    titulo_var <- ifelse(is.null(titulo), var, titulos[i]) # se não for especificado o título usa-se o nome da variável
     
-    # Verifica se var_tratamento foi preenchida
     if (!is.null(var_tratamento) && var_tratamento %in% names(dados)) {
       var_tratamento_final <- as.factor(dados[[var_tratamento]])
     } else {
@@ -39,7 +42,7 @@ f_oppen_graficos_distribuicao <- function(dados,
     # cumulative distribution function (cdf)
     grafico_cdf <- ggplot(dados, aes(x = !!as.name(var), color = var_tratamento_final)) +
       geom_line(stat = "density") +
-      labs(title = paste("Distribuição de", var), y = "densidade") +
+      labs(title = paste("Distribuição", titulo_var), y = "densidade") +
       theme_minimal(base_size = 10) +
       scale_color_discrete(name = "Grupo", labels = c("1" = "Tratamento", "0" = "Controle")) +
       coord_cartesian(ylim = ylim, xlim = xlim)
@@ -52,7 +55,7 @@ f_oppen_graficos_distribuicao <- function(dados,
     # empirical cumulative distribution function (ecdf)
     grafico_ecdf <- ggplot(dados, aes(x = !!as.name(var), color = var_tratamento_final)) +
       stat_ecdf(geom = "line") +
-      labs(title = paste("Distribuição acumulada de", var), y = "percentil") +
+      labs(title = paste("Distribuição acumulada", titulo_var), y = "percentil") +
       theme_minimal(base_size = 10) +
       scale_color_discrete(name = "Grupo", labels = c("1" = "Tratamento", "0" = "Controle")) +
       coord_cartesian(ylim = c(0,1), xlim = xlim)
