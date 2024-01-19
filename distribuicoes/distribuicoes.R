@@ -7,20 +7,23 @@
 # Os gráficos são salvos no diretório especificado e incluem distribuições de densidade e acumuladas para
 # cada variável de resultado.
 
-
 # Bibliotecas --------------------------------------------------------------------
 
 if(!require(tidyverse)) install.packages("tidyverse") # manipulação de dados
 if(!require(ggplot2)) install.packages("ggplot2")     # gráficos
 
 # Definindo parâmetros
-f_oppen_graficos_distribuicao <- function(dados,
+f_oppen_graficos_distribuicao <- function(dados, 
                                           vars_resultado,
                                           var_tratamento = NULL,
                                           imagens_dir = NULL,
                                           ylim = c(),
                                           xlim = c()) {
-# Loop  
+  
+  # Inicializando o contador de gráficos - para dizer no final quando vc criou :)
+  total_graficos <- 0
+  
+  # Loop  
   for (var in vars_resultado) {
     
     # Verifica se imagens_dir foi preenchida
@@ -40,8 +43,11 @@ f_oppen_graficos_distribuicao <- function(dados,
       theme_minimal(base_size = 10) +
       scale_color_discrete(name = "Grupo", labels = c("1" = "Tratamento", "0" = "Controle")) +
       coord_cartesian(ylim = ylim, xlim = xlim)
-    ggsave(paste0(imagens_dir_final, "distribuicao_cdf_", var, ".png"),
-           plot = grafico_cdf, width = 12.7, height = 6.7, units = "cm")
+    
+    # salvando e incrementando o contador
+    suppressWarnings(ggsave(paste0(imagens_dir_final, "distribuicao_cdf_", var, ".png"),
+           plot = grafico_cdf, width = 12.7, height = 6.7, units = "cm"))
+    total_graficos <- total_graficos + 1 
     
     # empirical cumulative distribution function (ecdf)
     grafico_ecdf <- ggplot(dados, aes(x = !!as.name(var), color = var_tratamento_final)) +
@@ -50,13 +56,13 @@ f_oppen_graficos_distribuicao <- function(dados,
       theme_minimal(base_size = 10) +
       scale_color_discrete(name = "Grupo", labels = c("1" = "Tratamento", "0" = "Controle")) +
       coord_cartesian(ylim = c(0,1), xlim = xlim)
-    
-    ggsave(paste0(imagens_dir_final, "distribuicao_ecdf_", var, ".png"),
-           plot = grafico_ecdf, width = 12.7, height = 6.7, units = "cm")
+
+    # salvando e incrementando o contador
+    suppressWarnings(ggsave(paste0(imagens_dir_final, "distribuicao_ecdf_", var, ".png"),
+           plot = grafico_ecdf, width = 12.7, height = 6.7, units = "cm"))
+    total_graficos <- total_graficos + 1
   }
   
   # gran finale
-  print("Vualá! você criou gráficos lindos! Uhuuuuuul")
-  
-  
+  cat("Você criou um total de", total_graficos, "gráficos lindos! Uhuuuuuul\n") 
 }
