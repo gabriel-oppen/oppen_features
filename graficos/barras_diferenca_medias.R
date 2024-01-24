@@ -1,3 +1,9 @@
+
+# Descrição do programa
+## Este cria gráficos de barras com intervalo de confiança a partir de um conjunto de dados.
+## A função f_oppen_graficos_barras aceita parâmetros como variáveis de tempo, resultado, e grupo,
+## além de permitir a personalização de rótulos e o armazenamento das imagens geradas em um diretório específico.
+
 # Bibliotecas --------------------------------------------------------------------
 
 if(!require(tidyverse)) install.packages("tidyverse") # manipulação de dados
