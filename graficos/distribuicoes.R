@@ -34,7 +34,7 @@ f_oppen_graficos_distribuicao <- function(dados,
     imagens_dir_final <- ifelse(is.null(imagens_dir), "", imagens_dir)
     titulo_var <- ifelse(is.null(titulo), var, titulos[i]) # se não for especificado o título usa-se o nome da variável
     
-    if (!is.null(var_tratamento) && var_tratamento %in% names(dados)) {
+    if (!is.null(var_tratamento) && var_tratamento %in% names(dados)) { # && é um operador condicional que avalia apenas a primeira expressão e, se for falsa, não avalia a segunda expressão. Isso é conhecido como "short-circuiting".
       var_tratamento_final <- as.factor(dados[[var_tratamento]])
     } else {
       var_tratamento_final <- NULL
