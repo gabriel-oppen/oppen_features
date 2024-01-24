@@ -18,6 +18,7 @@ f_oppen_graficos_distribuicao <- function(dados,
                                           var_tratamento = NULL,
                                           imagens_dir = NULL,
                                           titulo = NULL,
+                                          nota = NULL,
                                           ylim = c(),
                                           xlim = c()) {
   
@@ -42,8 +43,10 @@ f_oppen_graficos_distribuicao <- function(dados,
     # cumulative distribution function (cdf)
     grafico_cdf <- ggplot(dados, aes(x = !!as.name(var), color = var_tratamento_final)) +
       geom_line(stat = "density") +
-      labs(title = paste("Distribuição", titulo_var), y = "densidade") +
+      labs(title = paste("Distribuição", titulo_var), y = "densidade",
+           caption = nota) +
       theme_minimal(base_size = 10) +
+      theme(plot.caption = element_text(size = 4)) + # tamanho da legenda
       scale_color_discrete(name = "Grupo", labels = c("1" = "Tratamento", "0" = "Controle")) +
       coord_cartesian(ylim = ylim, xlim = xlim)
     
@@ -55,8 +58,10 @@ f_oppen_graficos_distribuicao <- function(dados,
     # empirical cumulative distribution function (ecdf)
     grafico_ecdf <- ggplot(dados, aes(x = !!as.name(var), color = var_tratamento_final)) +
       stat_ecdf(geom = "line") +
-      labs(title = paste("Distribuição acumulada", titulo_var), y = "percentil") +
+      labs(title = paste("Distribuição acumulada", titulo_var), y = "percentil",
+           caption = nota) +
       theme_minimal(base_size = 10) +
+      theme(plot.caption = element_text(size = 4)) + # tamanho da legenda
       scale_color_discrete(name = "Grupo", labels = c("1" = "Tratamento", "0" = "Controle")) +
       coord_cartesian(ylim = c(0,1), xlim = xlim)
 
