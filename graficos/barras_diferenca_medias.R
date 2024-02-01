@@ -1,8 +1,8 @@
-
 # Descrição do programa
 ## Este cria gráficos de barras com intervalo de confiança a partir de um conjunto de dados.
 ## A função f_oppen_graficos_barras aceita parâmetros como variáveis de tempo, resultado, e grupo,
 ## além de permitir a personalização de rótulos e o armazenamento das imagens geradas em um diretório específico.
+
 
 # Bibliotecas --------------------------------------------------------------------
 
@@ -42,12 +42,12 @@ f_oppen_graficos_barras <- function(dados,
     tempo_var_final <- ifelse(is.null(tempo_var), grupo_var_final, tempo_var)
     
     # Criar gráfico de barras
-    grafico_barras <- ggplot(dados, aes(x = tempo_var_final, y = !!as.name(var), fill = grupo_var_final)) +
+    grafico_barras <- ggplot(dados, aes(x = as.factor(!!as.name(tempo_var_final)), y = !!as.name(var), fill = grupo_var_final)) +
       stat_summary(geom = "bar", position = "dodge", color = "black", fun = "mean") +
       stat_summary(geom = "errorbar", position = position_dodge(0.9), width = 0.25, fun.data = "mean_cl_normal") +
       labs(title = paste0("Diferença entre médias de ", label_var),
            x = "tempo",
-           y = label,
+           y = label_var,
            fill = "Grupos",
            caption = nota) +
       theme_minimal(base_size = 10) +
