@@ -4,6 +4,10 @@
 ## além de permitir a personalização de rótulos e o armazenamento das imagens geradas em um diretório específico.
 
 
+# TODO
+## 1. Fazer função funcionar quando tempo_var não é definida
+
+
 # Bibliotecas --------------------------------------------------------------------
 
 if(!require(tidyverse)) install.packages("tidyverse") # manipulação de dados
@@ -39,14 +43,15 @@ f_oppen_graficos_barras <- function(dados,
       grupo_var_final <- NULL
     }
     
-    tempo_var_final <- ifelse(is.null(tempo_var), grupo_var_final, tempo_var)
+    tempo_var_final <- ifelse(is.null(tempo_var), "", tempo_var) # função get() pega 'string' e roda como se fosse string (sem aspas)
+    tempo_label <- ifelse(is.null(tempo_var), "", "tempo")
     
     # Criar gráfico de barras
-    grafico_barras <- ggplot(dados, aes(x = as.factor(!!as.name(tempo_var_final)), y = !!as.name(var), fill = grupo_var_final)) +
+    grafico_barras <- ggplot(dados, aes(x = !!as.name(tempo_var_final), y = !!as.name(var), fill = grupo_var_final)) +
       stat_summary(geom = "bar", position = "dodge", color = "black", fun = "mean") +
       stat_summary(geom = "errorbar", position = position_dodge(0.9), width = 0.25, fun.data = "mean_cl_normal") +
       labs(title = paste0("Diferença entre médias de ", label_var),
-           x = "tempo",
+           x = tempo_label,
            y = label_var,
            fill = "Grupos",
            caption = nota) +
