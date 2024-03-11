@@ -1,34 +1,61 @@
 # Descrição do programa
 
-library(tidyverse)
-#library(car)
-library(writexl)      # salva em .xlsx
-library(lmtest)       # cálculo de erro padrão robusto
-library(estimatr)     # efeitos robustos
-library(ivreg)        # variaveis instrumentais
+# Abrindo e/ou instalando bibs
+if (!requireNamespace("tidyverse", quietly = TRUE)) {
+  install.packages("tidyverse")
+}
 
+if (!requireNamespace("writexl", quietly = TRUE)) {
+  install.packages("writexl")
+}
+
+if (!requireNamespace("lmtest", quietly = TRUE)) {
+  install.packages("lmtest")
+}
+
+if (!requireNamespace("estimatr", quietly = TRUE)) {
+  install.packages("estimatr")
+}
+
+if (!requireNamespace("ivreg", quietly = TRUE)) {
+  install.packages("ivreg")
+}
+
+if (!requireNamespace("sandwich", quietly = TRUE)) {
+  install.packages("sandwich")
+}
+  total_regs <- 0 # Inicializando o contador de gráficos - para dizer no final quantas vc criou :)
+  
 # Função para estimar e salvar resultados
 f_oppen_estima_ITT_LATE     <- function(dados,
 										vars_controle,
 										vars_resultado,
 										var_tratamento_sorteado, # tratamento atribuído pelo sorteio (para calcular o ITT)
 										var_tratamento_recebido, # tratamento de fato (para calcular o LATE)
-										tempo = NULL # tempo do impacto
+										tempo_final = NULL,       # último tempo do impacto
+										output_path
 ) {
   
   dados_final <- data.frame() # dataframe vazio para armazenar resultados do loop
   
+  
+
+  
   for (i in seq_along(vars_resultado)) {
   
+	for (t in 1:tempo_final) {
+  
     var <- vars_resultado[i]
+	
+	total_regs <- total_regs + 1
 	
 	dados$tratamento_sorteado <- dados[[var_tratamento_sorteado]] # criando variável
 	dados$tratamento_recebido <- dados[[var_tratamento_recebido]] # criando variável
     
     # Estimando ITT com variáveis e com erro padrão simples
-    model_ITT <- lm(dados[[var]][tempo == 2] ~ dados$tratamento_sorteado[tempo == 2] + dados[[var]][tempo == 0], data = dados)
+    model_ITT <- lm(dados[[var]][tempo == t] ~ dados$tratamento_sorteado[tempo == t], data = dados)
     
-    formula_ITT_control <- formula(paste0(var, "[tempo == 2] ~ tratamento_sorteado[tempo == 2] + ", vars_controle))
+    formula_ITT_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_sorteado[tempo == ", t, "] + ", vars_controle))
     model_ITT_control <- lm(formula_ITT_control, data = dados)
     
     # Estimando ITT com variáveis e com erro padrão robusto
@@ -36,9 +63,9 @@ f_oppen_estima_ITT_LATE     <- function(dados,
     model_ITT_control_rob <- coeftest(model_ITT_control, vcov = vcovHC(model_ITT_control, "HC1"), save = TRUE)
     
     # Estimando LATE com variáveis e com erro padrão simples
-    model_LATE <- ivreg(dados[[var]][tempo == 2] ~ dados$tratamento_recebido[tempo == 2] + dados[[var]][tempo == 0] | dados$tratamento_sorteado[tempo == 2] + dados[[var]][tempo == 0], data = dados)
+    model_LATE <- ivreg(dados[[var]][tempo == t] ~ dados$tratamento_recebido[tempo == t] | dados$tratamento_sorteado[tempo == t] , data = dados)
     
-    formula_LATE_control <- formula(paste0(var, "[tempo == 2] ~ tratamento_recebido[tempo == 2] + ", vars_controle, " | ", "dados$tratamento_sorteado[tempo == 2] + ", vars_controle))
+    formula_LATE_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_recebido[tempo == ", t, "] + ", vars_controle, " | ", "dados$tratamento_sorteado[tempo == ", t, "] + ", vars_controle))
     model_LATE_control <- ivreg(formula_LATE_control, data = dados)
     
     # Estimando LATE com variáveis e com erro padrão robusto
@@ -49,17 +76,27 @@ f_oppen_estima_ITT_LATE     <- function(dados,
     dados_resultados <- data.frame(
       variavel = c(var, var, var, var),
       efeito = c(round(model_ITT$coefficients[[2]], 2), round(model_LATE$coefficients[[2]], 2), round(model_ITT_control$coefficients[[2]], 2), round(model_LATE_control$coefficients[[2]], 2)),
-      desvio_padrao = c(round(model_ITT_rob[nrow(model_ITT_rob) + 2], 2), round(model_LATE_rob[nrow(model_LATE_rob) + 2], 2), round(model_ITT_control_rob[nrow(model_ITT_control_rob) + 2], 2), round(model_LATE_control_rob[nrow(model_LATE_control_rob) + 2], 2)),
+      erro_padrao = c(round(model_ITT_rob[nrow(model_ITT_rob) + 2], 2), round(model_LATE_rob[nrow(model_LATE_rob) + 2], 2), round(model_ITT_control_rob[nrow(model_ITT_control_rob) + 2], 2), round(model_LATE_control_rob[nrow(model_LATE_control_rob) + 2], 2)),
       n_obs = c(nrow(model_ITT[["model"]]), nrow(model_LATE[["model"]]), nrow(model_ITT_control[["model"]]),  nrow(model_LATE_control[["model"]])),
       p_val = c(round(model_ITT_rob[nrow(model_ITT_rob) * 3 + 2], 2), round(model_LATE_rob[nrow(model_LATE_rob) * 3 + 2], 2), round(model_ITT_control_rob[nrow(model_ITT_control_rob) * 3 + 2], 2), round(model_LATE_control_rob[nrow(model_LATE_control_rob) * 3 + 2], 2)),
-      estimador = c("ITT", "LATE", "ITT + controles LB", "LATE + controles LB")
+      estimador = c("ITT", "LATE", "ITT", "LATE"),
+	  controles  = c("não", "não", "sim", "sim"),
+	  tempo =  t
     )
     
+	 
     dados_final <- bind_rows(dados_final, dados_resultados) # juntando dataframes
-    
+	dados_final <- dados_final %>% arrange(desc(tempo), desc(controles), desc(variavel), estimador)
+	
+    total_regs <- total_regs + 2
   }
   
-  # Salvando
-  write_xlsx(dados_final, path = paste0(output_dir, "/tabelas/coef_medios_ITT_LATE.xlsx"))
 }
 
+  # Salvando
+  write_xlsx(dados_final, path = paste0(output_path, "/tabelas/coef_medios_ITT_LATE.xlsx"))
+  
+  
+  # gran finale
+  cat("Ihhaaaaaa! Você gerou uma tabela top com resultados de", total_regs , "regressões!\n") 
+}
