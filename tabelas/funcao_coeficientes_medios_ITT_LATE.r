@@ -79,7 +79,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
 	#           ic_cima  = efeito + qt(0.95, n_obs - 1) * erro_padrao / sqrt(n_obs))
 	  
 	  # Organizando
-	  dados_final <- dados_final %>% reframe(tempo,estimador,variavel,n_obs,efeito,erro_padrao,p_val,controles)
+	  dados_final <- dados_final %>% reframe(tempo,variavel,estimador,n_obs,efeito, erro_padrao,p_val,controles)
 	  dados_final <- dados_final %>% arrange(desc(tempo), desc(controles), desc(variavel), estimador)
 	  
     total_regs <- total_regs + 2
