@@ -1,29 +1,14 @@
 # Descrição do programa
 
 # Abrindo e/ou instalando bibs
-if (!requireNamespace("tidyverse", quietly = TRUE)) {
-  install.packages("tidyverse")
-}
 
-if (!requireNamespace("writexl", quietly = TRUE)) {
-  install.packages("writexl")
-}
+if(!require(tidyverse)) install.packages("tidyverse") # manipulação de dados
+if(!require(writexl)) install.packages("writexl")     # salva em .xlsx
+if(!require(lmtest)) install.packages("lmtest")      # testes late
+if(!require(estimatr)) install.packages("estimatr")    # testes late
+if(!require(ivreg)) install.packages("ivreg")       # testes late
+if(!require(sandwich)) install.packages("sandwich")    # testes late
 
-if (!requireNamespace("lmtest", quietly = TRUE)) {
-  install.packages("lmtest")
-}
-
-if (!requireNamespace("estimatr", quietly = TRUE)) {
-  install.packages("estimatr")
-}
-
-if (!requireNamespace("ivreg", quietly = TRUE)) {
-  install.packages("ivreg")
-}
-
-if (!requireNamespace("sandwich", quietly = TRUE)) {
-  install.packages("sandwich")
-}
   total_regs <- 0 # Inicializando o contador de gráficos - para dizer no final quantas vc criou :)
   
 # Função para estimar e salvar resultados
