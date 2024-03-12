@@ -48,7 +48,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
     model_ITT_control_rob <- coeftest(model_ITT_control, vcov = vcovHC(model_ITT_control, "HC1"), save = TRUE)
     
     # Estimando LATE com variáveis e com erro padrão simples
-    model_LATE <- ivreg(dados[[var]][tempo == t] ~ dados$tratamento_recebido[tempo == t] | dados$tratamento_sorteado[tempo == t] , data = dados)
+    model_LATE <- ivreg(dados[[var]][tempo == t] ~ dados$tratamento_recebido[tempo == t] | dados$tratamento_sorteado[tempo == t] , data = dados) #Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
     
     formula_LATE_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_recebido[tempo == ", t, "] + ", vars_controle, " | ", "dados$tratamento_sorteado[tempo == ", t, "] + ", vars_controle))
     model_LATE_control <- ivreg(formula_LATE_control, data = dados)
@@ -69,10 +69,19 @@ f_oppen_estima_ITT_LATE     <- function(dados,
 	  tempo =  t
     )
     
-	 
+    
     dados_final <- bind_rows(dados_final, dados_resultados) # juntando dataframes
-	dados_final <- dados_final %>% arrange(desc(tempo), desc(controles), desc(variavel), estimador)
-	
+    
+	# Tendando calcular intervalos de confiança
+	#  dados_final <- dados_final %>% 
+	#    #group_by(variavel, tempo, controles, estimador) %>% 
+	#    mutate(ic_baixo = efeito - qt(0.95, n_obs - 1) * erro_padrao / sqrt(n_obs),
+	#           ic_cima  = efeito + qt(0.95, n_obs - 1) * erro_padrao / sqrt(n_obs))
+	  
+	  # Organizando
+	  dados_final <- dados_final %>% reframe(tempo,estimador,variavel,n_obs,efeito,erro_padrao,p_val,controles)
+	  dados_final <- dados_final %>% arrange(desc(tempo), desc(controles), desc(variavel), estimador)
+	  
     total_regs <- total_regs + 2
   }
   
