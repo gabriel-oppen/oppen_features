@@ -72,7 +72,8 @@ f_oppen_estima_ITT_LATE     <- function(dados,
         )
         
         dados_resultados <- dados_resultados %>%
-          mutate(tratamento_completo = var_trat_receb)
+          mutate(tratamento_completo = var_trat_receb,
+                 heterogeneidade = "não")
         
         dados_final <- bind_rows(dados_final, dados_resultados) # juntando dataframes
         
@@ -83,7 +84,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
         #           ic_cima  = efeito + qt(0.95, n_obs - 1) * erro_padrao / sqrt(n_obs))
         
         # Organizando
-        dados_final <- dados_final %>% reframe(tempo,variavel,estimador,n_obs,efeito, erro_padrao,p_val,controles, tratamento_completo)
+        dados_final <- dados_final %>% reframe(tempo,variavel,estimador,n_obs,efeito, erro_padrao,p_val,controles,tratamento_completo, heterogeneidade)
         dados_final <- dados_final %>% arrange(desc(tempo), desc(controles), desc(variavel), estimador)
         
         total_regs <- total_regs + 2
