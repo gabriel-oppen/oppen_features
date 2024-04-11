@@ -5,6 +5,8 @@
 if(!require(tidyverse)) install.packages("tidyverse")             # manipulação de dados
 if(!require(writexl)) install.packages("writexl")                 # salva em .xlsx
 if(!require(causalweight)) install.packages("causalweight")       # IPW
+if(!require(fastDummies)) install.packages("fastDummies")         # Cria dummies de factors
+
 
 
 total_regs <- 0 # Inicializando o contador de gráficos - para dizer no final quantas vc criou :)
@@ -40,11 +42,19 @@ f_oppen_estima_IPW     <- function(dados,
           # Tirando valores nulos de y e definindo o tempo
           dados_filter <- dados %>%
             filter(!is.na(dados[[var]]) & dados[["tempo"]] == t)
-          # Definindo a matrix de controles
-          vars_control <- dados_filter[, vars_controle_atrito]
-          vars_control <- as.matrix(sapply(vars_control, as.numeric))
           
-          model <- lateweight(y = dados_filter[[var]], d = dados_filter$tratamento_recebido, z = dados_filter$tratamento_sorteado, x = vars_control)
+          
+          #vars_control <- as.matrix(sapply(vars_control, as.numeric)) # Definindo a matrix de controles
+          
+          # Cria dummies para os factors
+          vars_control <- dados_filter[, vars_controle_atrito]
+          factor_vars <- names(vars_control)[sapply(vars_control, is.factor)]  # Identify factor variables
+          controls_df <- dummy_cols(vars_control, select_columns = factor_vars) # Create dummy variables for each level of factor variable
+          controls_df <- select(controls_df, -all_of(factor_vars)) # Remove original factor variables
+          
+          
+          # Rodando modelo
+          model <- lateweight(y = dados_filter[[var]], d = dados_filter$tratamento_recebido, z = dados_filter$tratamento_sorteado, x = controls_df)
           
           
           df_resultados <- data.frame(
@@ -54,6 +64,7 @@ f_oppen_estima_IPW     <- function(dados,
             estimador = tipo_estimador,
             tratamento_completo = var_trat_receb,
             controles = "sim",
+            metodo = "Diferença de Médias",
             heterogeneidade = "não",
             metodo_atrito_nao_aleatorio = "IPW"
           )
@@ -72,6 +83,12 @@ f_oppen_estima_IPW     <- function(dados,
                 estimador == "LATE" ~ model$effect,
                 .default = NA)
             )
+          
+          # Calculando intervalos de confiança
+          df_resultados <- df_resultados %>% 
+            mutate(ic_baixo = efeito - qt(0.95, n_obs - 1) * erro_padrao,
+                   ic_cima  = efeito + qt(0.95, n_obs - 1) * erro_padrao,
+                   ic = paste0("[",ic_baixo," , ",ic_cima,"]"))
           
           
           df_ipw <- rbind(df_ipw, df_resultados) # juntando dfs

@@ -40,29 +40,31 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
           
           total_regs <- total_regs + 1
           
-          dados$hetero_dummy        <- dados[[var_hete]] 
-          dados$tratamento_dummy    <- dados[[var_tratamento_sorteado]]
-          dados$tratamento_sorteado <- dados[[var_tratamento_sorteado]]*dados[[var_hete]] 
-          dados$tratamento_recebido <- dados[[var_trat_receb]]*dados[[var_hete]]
+          dados2 <- dados
+          
+          dados2$hetero_dummy        <- dados2[[var_hete]] 
+          dados2$tratamento_dummy    <- dados2[[var_tratamento_sorteado]]
+          dados2$tratamento_sorteado <- dados2[[var_tratamento_sorteado]]*dados2[[var_hete]] 
+          dados2$tratamento_recebido <- dados2[[var_trat_receb]]*dados2[[var_hete]]
           
           
           
           
           # Estimando ITT com variáveis e com erro padrão simples
-          model_ITT <- lm(dados[[var]][tempo == t] ~ dados$tratamento_sorteado[tempo == t] + dados$tratamento_dummy[tempo == t] + dados$hetero_dummy[tempo == t], data = dados)
+          model_ITT <- lm(dados2[[var]][tempo == t] ~ dados2$tratamento_sorteado[tempo == t] + dados2$tratamento_dummy[tempo == t] + dados2$hetero_dummy[tempo == t], data = dados2)
           
           formula_ITT_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_sorteado[tempo == ", t, "] + tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle))
-          model_ITT_control <- lm(formula_ITT_control, data = dados)
+          model_ITT_control <- lm(formula_ITT_control, data = dados2)
           
           # Estimando ITT com variáveis e com erro padrão robusto
           model_ITT_rob <- coeftest(model_ITT, vcov = vcovHC(model_ITT, "HC1"), save = TRUE)
           model_ITT_control_rob <- coeftest(model_ITT_control, vcov = vcovHC(model_ITT_control, "HC1"), save = TRUE)
           
           # Estimando LATE com variáveis e com erro padrão simples
-          model_LATE <- ivreg(dados[[var]][tempo == t] ~ dados$tratamento_recebido[tempo == t] + dados$tratamento_dummy[tempo == t] + dados$hetero_dummy[tempo == t] | dados$tratamento_sorteado[tempo == t] + dados$tratamento_dummy[tempo == t] + dados$hetero_dummy[tempo == t], data = dados) #Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
+          model_LATE <- ivreg(dados2[[var]][tempo == t] ~ dados2$tratamento_recebido[tempo == t] + dados2$tratamento_dummy[tempo == t] + dados2$hetero_dummy[tempo == t] | dados2$tratamento_sorteado[tempo == t] + dados2$tratamento_dummy[tempo == t] + dados2$hetero_dummy[tempo == t], data = dados2) #Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
           
-          formula_LATE_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_recebido[tempo == ", t, "] +  tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle, " | ", "dados$tratamento_sorteado[tempo == ", t, "] + tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle))
-          model_LATE_control <- ivreg(formula_LATE_control, data = dados)
+          formula_LATE_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_recebido[tempo == ", t, "] +  tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle, " | ", "dados2$tratamento_sorteado[tempo == ", t, "] + tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle))
+          model_LATE_control <- ivreg(formula_LATE_control, data = dados2)
           
           # Estimando LATE com variáveis e com erro padrão robusto
           model_LATE_rob <- coeftest(model_LATE, vcov = vcovHC(model_LATE, "HC1"), save = TRUE)
@@ -77,6 +79,7 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
             p_val = c(model_ITT_rob[nrow(model_ITT_rob) * 3 + 2], model_LATE_rob[nrow(model_LATE_rob) * 3 + 2], model_ITT_control_rob[nrow(model_ITT_control_rob) * 3 + 2], model_LATE_control_rob[nrow(model_LATE_control_rob) * 3 + 2]),
             estimador = c("ITT", "LATE", "ITT", "LATE"),
             controles  = c("não", "não", "sim", "sim"),
+            metodo = c("Diferença de Médias", "Diferença de Médias", "Diferença de Médias", "Diferença de Médias"),
             tempo =  t
           )
           
@@ -87,13 +90,14 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
           dados_final <- bind_rows(dados_final, dados_resultados) # juntando dataframes
           
           # Tendando calcular intervalos de confiança
-          #  dados_final <- dados_final %>% 
-          #    #group_by(variavel, tempo, controles, estimador) %>% 
-          #    mutate(ic_baixo = efeito - qt(0.95, n_obs - 1) * erro_padrao / sqrt(n_obs),
-          #           ic_cima  = efeito + qt(0.95, n_obs - 1) * erro_padrao / sqrt(n_obs))
+            dados_final <- dados_final %>% 
+              #group_by(variavel, tempo, controles, estimador) %>% 
+              mutate(ic_baixo = efeito - qt(0.95, n_obs - 1) * erro_padrao,
+                     ic_cima  = efeito + qt(0.95, n_obs - 1) * erro_padrao,
+                     ic = paste0("[",ic_baixo," , ",ic_cima,"]"))
           
           # Organizando
-          dados_final <- dados_final %>% reframe(tempo,variavel,estimador,n_obs,efeito, erro_padrao,p_val,controles, tratamento_completo, heterogeneidade)
+          dados_final <- dados_final %>% reframe(tempo,variavel,estimador,n_obs,efeito, ic_baixo, ic_cima, ic, erro_padrao,p_val, metodo, controles, tratamento_completo, heterogeneidade)
           dados_final <- dados_final %>% arrange(desc(tempo), desc(controles), desc(variavel), estimador)
           
           total_regs <- total_regs + 2
