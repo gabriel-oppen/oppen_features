@@ -22,7 +22,18 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
                                                     output_path
 ) {
   
-  dados_final <- data.frame() # dataframe vazio para armazenar resultados do loop
+  # Criando controles
+  
+  controles <- character(length(vars_controle)) # criando lista de controles vazia
+  
+  for (i in seq_along(vars_controle)) {
+    controles[i] <- paste0("df$", vars_controle[i], "[tempo == 0]") # adicionando os controles na lista
+  }
+  
+  vars_controle <- paste(controles, collapse = " + ") # putting a '+' between the variables
+  
+  # Criando df vazio para armazenar resultados do loop
+  dados_final <- data.frame() 
   
   
   for (i in seq_along(vars_resultado)) {
@@ -40,31 +51,31 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
           
           total_regs <- total_regs + 1
           
-          dados2 <- dados
+          df <- dados
           
-          dados2$hetero_dummy        <- dados2[[var_hete]] 
-          dados2$tratamento_dummy    <- dados2[[var_tratamento_sorteado]]
-          dados2$tratamento_sorteado <- dados2[[var_tratamento_sorteado]]*dados2[[var_hete]] 
-          dados2$tratamento_recebido <- dados2[[var_trat_receb]]*dados2[[var_hete]]
+          df$hetero_dummy        <- df[[var_hete]] 
+          df$tratamento_dummy    <- df[[var_tratamento_sorteado]]
+          df$tratamento_sorteado <- df[[var_tratamento_sorteado]]*df[[var_hete]] 
+          df$tratamento_recebido <- df[[var_trat_receb]]*df[[var_hete]]
           
           
           
           
           # Estimando ITT com variáveis e com erro padrão simples
-          model_ITT <- lm(dados2[[var]][tempo == t] ~ dados2$tratamento_sorteado[tempo == t] + dados2$tratamento_dummy[tempo == t] + dados2$hetero_dummy[tempo == t], data = dados2)
+          model_ITT <- lm(df[[var]][tempo == t] ~ df$tratamento_sorteado[tempo == t] + df$tratamento_dummy[tempo == t] + df$hetero_dummy[tempo == t], data = df)
           
           formula_ITT_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_sorteado[tempo == ", t, "] + tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle))
-          model_ITT_control <- lm(formula_ITT_control, data = dados2)
+          model_ITT_control <- lm(formula_ITT_control, data = df)
           
           # Estimando ITT com variáveis e com erro padrão robusto
           model_ITT_rob <- coeftest(model_ITT, vcov = vcovHC(model_ITT, "HC1"), save = TRUE)
           model_ITT_control_rob <- coeftest(model_ITT_control, vcov = vcovHC(model_ITT_control, "HC1"), save = TRUE)
           
           # Estimando LATE com variáveis e com erro padrão simples
-          model_LATE <- ivreg(dados2[[var]][tempo == t] ~ dados2$tratamento_recebido[tempo == t] + dados2$tratamento_dummy[tempo == t] + dados2$hetero_dummy[tempo == t] | dados2$tratamento_sorteado[tempo == t] + dados2$tratamento_dummy[tempo == t] + dados2$hetero_dummy[tempo == t], data = dados2) #Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
+          model_LATE <- ivreg(df[[var]][tempo == t] ~ df$tratamento_recebido[tempo == t] + df$tratamento_dummy[tempo == t] + df$hetero_dummy[tempo == t] | df$tratamento_sorteado[tempo == t] + df$tratamento_dummy[tempo == t] + df$hetero_dummy[tempo == t], data = df) #Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
           
-          formula_LATE_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_recebido[tempo == ", t, "] +  tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle, " | ", "dados2$tratamento_sorteado[tempo == ", t, "] + tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle))
-          model_LATE_control <- ivreg(formula_LATE_control, data = dados2)
+          formula_LATE_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_recebido[tempo == ", t, "] +  tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle, " | ", "df$tratamento_sorteado[tempo == ", t, "] + tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle))
+          model_LATE_control <- ivreg(formula_LATE_control, data = df)
           
           # Estimando LATE com variáveis e com erro padrão robusto
           model_LATE_rob <- coeftest(model_LATE, vcov = vcovHC(model_LATE, "HC1"), save = TRUE)
@@ -99,7 +110,7 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
           # Organizando
           dados_final <- dados_final %>% reframe(tempo,variavel,estimador,n_obs,efeito, ic_baixo, ic_cima, ic, erro_padrao,p_val, metodo, controles, tratamento_completo, heterogeneidade)
           dados_final <- dados_final %>% arrange(desc(tempo), desc(controles), desc(variavel), estimador)
-          
+          dados_final$metodo_atrito_nao_aleatorio <- "Nenhum"
           total_regs <- total_regs + 2
         }
       }
