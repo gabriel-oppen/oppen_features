@@ -52,7 +52,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
             df <- dados %>% 
               filter(tempo %in% c(t,0))
             
-            df_fractions <- df %>%
+            df_fractions <- df %>% # cria um df com nº de observações sem missings em cada tempo
               group_by(tratamento, tempo) %>% 
               filter(!is.na(!!sym(var)) & tempo %in% c(t, 0)) %>%  # quando você usa !!sym(var), o sym(var) converte a string var em um símbolo, e !! então avalia esse símbolo dentro da expressão
               reframe(n_obs = n())
@@ -64,60 +64,77 @@ f_oppen_estima_ITT_LATE     <- function(dados,
             
             # Criando subset do grupo com menor taxa de atrito
             if (remaining_treatment > remaining_control) {
-              maior_atrito = 0
+              menor_atrito = 1
             }
             if (remaining_treatment < remaining_control) {
-              maior_atrito = 1
+              menor_atrito = 0
             }
             
-            dados_maioratrito <- subset(df, tratamento == maior_atrito & tempo == t & consent == 1)
+            dados_menoratrito <- subset(df, tratamento == menor_atrito & tempo == t & consent == 1)
             
             # Definindo número para remover
-            n_remover <- round(nrow(dados_maioratrito) * trimming_fraction, 0)
+            n_remover <- round(nrow(dados_menoratrito) * trimming_fraction, 0)
             
-            if (tipo_metodo == "Lee Bounds - Upper" & length(unique(df[[var]][!is.na(df[[var]])])) == 2){ # Segunda condição checar se variável é binária
+            if (tipo_metodo == "Lee Bounds - Upper" & length(unique(df[[var]][!is.na(df[[var]])])) > 2){ # Segunda condição checar se variável é binária
               # Gerando ranking e removendo   
-              df_remover <- dados_maioratrito %>% 
-                arrange(!!sym(var)) %>% 
+              df_remover <- dados_menoratrito %>% 
+                arrange(desc(!!sym(var))) %>% 
                 mutate(rank = row_number()) %>% 
                 filter(rank <= n_remover)
             }
+            
+           if (tipo_metodo == "Lee Bounds - Upper" & length(unique(df[[var]][!is.na(df[[var]])])) == 2) {
+             n_remover <- dados_menoratrito %>%
+               summarise(n_obs = round(n() * trimming_fraction))
+             
+             n_remover <- n_remover$n_obs
+             
+             df_remover <- dados_menoratrito %>%
+               filter(!!sym(var) == 1)
+             
+             if (n_remover <= nrow(df_remover)) {
+               df_remover <- df_remover %>% 
+                 sample_n(size = n_remover, replace = FALSE) # removendo aleatóriamente
+             }
+             else if (n_remover > nrow(df_remover)) {
+               n_remover = nrow(df_remover) # CUIDADO! Isso serve para quebrar um galho, mas o nº de observações do Lee bound ficará diferen no Upper e no Lower, o que pode prejudicar a interpretação.
+               df_remover <- df_remover %>% 
+                 sample_n(size = n_remover, replace = FALSE) # removendo aleatóriamente
+             }
+
+           }
             # Gerando ranking e removendo  
-            if (tipo_metodo == "Lee Bounds - Lower" & length(unique(df[[var]][!is.na(df[[var]])])) > 2){ # Segunda condição checar se variável não é binária
-              df_remover <- dados_maioratrito %>% 
-                arrange(desc(!!sym(var))) %>% # invertendo a ordem 
+            if (tipo_metodo == "Lee Bounds - Lower" & length(unique(df[[var]][!is.na(df[[var]])])) > 2) { # Segunda condição checar se variável não é binária
+              df_remover <- dados_menoratrito %>% 
+                arrange(!!sym(var)) %>% # invertendo a ordem 
                 mutate(rank = row_number()) %>% 
                 filter(rank <= n_remover)
             }
             
-            if (tipo_metodo == "Lee Bounds - Upper" & length(unique(df[[var]][!is.na(df[[var]])])) == 2) {
-              n_remover <- dados_maioratrito %>%
-                filter(!!sym(var) == 1) %>%
+            if (tipo_metodo == "Lee Bounds - Lower" & length(unique(df[[var]][!is.na(df[[var]])])) == 2) { 
+              n_remover <- dados_menoratrito %>%
                 summarise(n_obs = round(n() * trimming_fraction))
               
               n_remover <- n_remover$n_obs
               
-              df_remover <- dados_maioratrito %>%
-                filter(!!sym(var) == 1) %>% 
-                sample_n(size = n_remover, replace = FALSE) # removendo aleatóriamente
-            }
-            
-            if (tipo_metodo == "Lee Bounds - Lower" & length(unique(df[[var]][!is.na(df[[var]])])) > 2) { 
-              n_remover <- dados_maioratrito %>%
-                filter(!!sym(var) == 0) %>%
-                summarise(n_obs = round(n() * trimming_fraction))
+              df_remover <- dados_menoratrito %>%
+                filter(!!sym(var) == 0)
               
-              n_remover <- n_remover$n_obs
-              
-              
-              df_remover <- dados_maioratrito %>%
-                filter(!!sym(var) == 0) %>% 
-                sample_n(size = n_remover, replace = FALSE) # removendo aleatóriamente
+              if (n_remover <= nrow(df_remover)) {
+                df_remover <- df_remover %>% 
+                  sample_n(size = n_remover, replace = FALSE) # removendo aleatóriamente
+              }
+              else if (n_remover > nrow(df_remover)) {
+                n_remover = nrow(df_remover)
+                df_remover <- df_remover %>% 
+                  sample_n(size = n_remover, replace = FALSE) # removendo aleatóriamente
+              }
             }  
             
-            
+          # Removendo
             df <- df %>% filter(!id %in% df_remover$id)
-          }
+          } # Fim do Lee bounds
+          
           
           if (tipo_metodo == "Nenhum") {
             df <- dados
