@@ -62,9 +62,9 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
           
           
           # Estimando ITT com variáveis e com erro padrão simples
-          model_ITT <- lm(df[[var]][tempo == t] ~ df$tratamento_sorteado[tempo == t] + df$tratamento_dummy[tempo == t] + df$hetero_dummy[tempo == t], data = df)
+          model_ITT <- lm(df[[var]][tempo == t] ~ df$tratamento_sorteado[tempo == t] + df$tratamento_dummy[tempo == t] + df$hetero_dummy[tempo == 0], data = df)
           
-          formula_ITT_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_sorteado[tempo == ", t, "] + tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle))
+          formula_ITT_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_sorteado[tempo == ", t, "] + tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", 0, "] + ", vars_controle))
           model_ITT_control <- lm(formula_ITT_control, data = df)
           
           # Estimando ITT com variáveis e com erro padrão robusto
@@ -72,9 +72,9 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
           model_ITT_control_rob <- coeftest(model_ITT_control, vcov = vcovHC(model_ITT_control, "HC1"), save = TRUE)
           
           # Estimando LATE com variáveis e com erro padrão simples
-          model_LATE <- ivreg(df[[var]][tempo == t] ~ df$tratamento_recebido[tempo == t] + df$tratamento_dummy[tempo == t] + df$hetero_dummy[tempo == t] | df$tratamento_sorteado[tempo == t] + df$tratamento_dummy[tempo == t] + df$hetero_dummy[tempo == t], data = df) #Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
+          model_LATE <- ivreg(df[[var]][tempo == t] ~ df$tratamento_recebido[tempo == t] + df$tratamento_dummy[tempo == t] + df$hetero_dummy[tempo == 0] | df$tratamento_sorteado[tempo == t] + df$tratamento_dummy[tempo == t] + df$hetero_dummy[tempo == 0], data = df) #Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
           
-          formula_LATE_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_recebido[tempo == ", t, "] +  tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle, " | ", "df$tratamento_sorteado[tempo == ", t, "] + tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", t, "] + ", vars_controle))
+          formula_LATE_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_recebido[tempo == ", t, "] +  tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", 0, "] + ", vars_controle, " | ", "df$tratamento_sorteado[tempo == ", t, "] + tratamento_dummy[tempo == ", t, "] + hetero_dummy[tempo == ", 0, "] + ", vars_controle))
           model_LATE_control <- ivreg(formula_LATE_control, data = df)
           
           # Estimando LATE com variáveis e com erro padrão robusto
