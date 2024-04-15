@@ -18,7 +18,8 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
                                                     var_tratamento_sorteado, # tratamento atribuído pelo sorteio (para calcular o ITT)
                                                     var_tratamento_recebido, # tratamento de fato (para calcular o LATE)
                                                     var_heterogeneo = NULL,         # variável para definir efeito heterogêneo 
-                                                    tempo_final = NULL,      # último tempo do impacto
+                                                    tempo_final = NULL,      # último tempo do impacto,
+                                                    vars_cluster,            # variável de cluster do erro padrão
                                                     output_path
 ) {
   
@@ -44,10 +45,14 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
         
         for (h in seq_along(var_heterogeneo)) {
           
+          for(c in seq_along(vars_cluster)) {
+            
+          
           # Definindo parâmetros do loop
           var            <- vars_resultado[i]
           var_trat_receb <- var_tratamento_recebido[w]
           var_hete       <- var_heterogeneo[h]
+          var_cluster    <- vars_cluster[c]
           
           total_regs <- total_regs + 1
           
@@ -57,7 +62,7 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
           df$tratamento_dummy    <- df[[var_tratamento_sorteado]]
           df$tratamento_sorteado <- df[[var_tratamento_sorteado]]*df[[var_hete]] 
           df$tratamento_recebido <- df[[var_trat_receb]]*df[[var_hete]]
-          
+          df$var_cluster         <- df[[var_cluster]] 
           
           
           
@@ -68,8 +73,8 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
           model_ITT_control <- lm(formula_ITT_control, data = df)
           
           # Estimando ITT com variáveis e com erro padrão robusto
-          model_ITT_rob <- coeftest(model_ITT, vcov = vcovHC(model_ITT, "HC1"), save = TRUE)
-          model_ITT_control_rob <- coeftest(model_ITT_control, vcov = vcovHC(model_ITT_control, "HC1"), save = TRUE)
+          model_ITT_rob <- coeftest(model_ITT, vcov = vcovCL(model_ITT, "HC1", cluster = df$var_cluster[df$tempo == 0]), save = TRUE)
+          model_ITT_control_rob <- coeftest(model_ITT_control, vcov = vcovHC(model_ITT_control, "HC1", cluster = df$var_cluster[df$tempo == 0]), save = TRUE)
           
           # Estimando LATE com variáveis e com erro padrão simples
           model_LATE <- ivreg(df[[var]][tempo == t] ~ df$tratamento_recebido[tempo == t] + df$tratamento_dummy[tempo == t] + df$hetero_dummy[tempo == 0] | df$tratamento_sorteado[tempo == t] + df$tratamento_dummy[tempo == t] + df$hetero_dummy[tempo == 0], data = df) #Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
@@ -78,8 +83,8 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
           model_LATE_control <- ivreg(formula_LATE_control, data = df)
           
           # Estimando LATE com variáveis e com erro padrão robusto
-          model_LATE_rob <- coeftest(model_LATE, vcov = vcovHC(model_LATE, "HC1"), save = TRUE)
-          model_LATE_control_rob <- coeftest(model_LATE_control, vcov = vcovHC(model_LATE_control, "HC1"), save = TRUE)
+          model_LATE_rob <- coeftest(model_LATE, vcov = vcovHC(model_LATE, "HC1", cluster = df$var_cluster[df$tempo == 0]), save = TRUE)
+          model_LATE_control_rob <- coeftest(model_LATE_control, vcov = vcovHC(model_LATE_control, "HC1", cluster = df$var_cluster[df$tempo == 0]), save = TRUE)
           
           # Adicionando resultados em um dataframe
           dados_resultados <- data.frame(
@@ -96,7 +101,8 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
           
           dados_resultados <- dados_resultados %>%
             mutate(tratamento_completo = var_trat_receb,
-                   heterogeneidade = var_hete)
+                   heterogeneidade = var_hete,
+                   cluster = var_cluster)
           
           dados_final <- bind_rows(dados_final, dados_resultados) # juntando dataframes
           
@@ -108,12 +114,13 @@ f_oppen_estima_heterogeneo_ITT_LATE     <- function(dados,
                      ic = paste0("[",ic_baixo," , ",ic_cima,"]"))
           
           # Organizando
-          dados_final <- dados_final %>% reframe(tempo,variavel,estimador,n_obs,efeito, ic_baixo, ic_cima, ic, erro_padrao,p_val, metodo, controles, tratamento_completo, heterogeneidade)
+          dados_final <- dados_final %>% reframe(tempo,variavel,estimador,n_obs,efeito, ic_baixo, ic_cima, ic, erro_padrao,p_val, metodo, controles, tratamento_completo, heterogeneidade, cluster)
           dados_final <- dados_final %>% arrange(desc(tempo), desc(controles), desc(variavel), estimador)
           dados_final$metodo_atrito_nao_aleatorio <- "Nenhum"
           total_regs <- total_regs + 2
         }
       }
+    }
     }
   }
   # Salvando
