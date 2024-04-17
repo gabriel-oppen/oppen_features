@@ -1,4 +1,4 @@
-# Descrição do programa
+# Descrição do programa: Essa função em R, intitulada f_oppen_estima_ITT_LATE, é projetada para estimar e salvar resultados de regressões. Ela aceita com inputs dados, variáveis de controle, variáveis de resultado, variáveis de tratamento sorteado e recebido (tratamneto de fato), além de outras configurações opcionais, como tempo final e variáveis de cluster. O procedimento inclui iterações através de diferentes métodos de estimativa, como "Nenhum", "Lee Bounds - Upper" e "Lee Bounds - Lower". Em cada iteração, a função ajusta modelos de regressão linear e IV (variáveis instrumentais), calcula estatísticas relevantes, como efeitos, erros padrão e intervalos de confiança, e os armazena em um dataframe. Além disso, os resultados são organizados e salvos em um arquivo Excel especificado pelo usuário. Ao final, a função fornece um feedback indicando quantas regressões foram realizadas com sucesso.
 
 # Abrindo e/ou instalando bibs
 
@@ -152,6 +152,14 @@ f_oppen_estima_ITT_LATE     <- function(dados,
             df$tratamento_recebido <- df[[var_trat_receb]] 
             df$var_cluster         <- df[[vars_cluster[c]]] 
             total_regs <- total_regs + 1
+            
+            # Substituir valores NA da variável de tratamento completo dentro de um mesmo ID (importante para o dif in dif)
+            df <- df %>%
+              group_by(id) %>%
+              mutate(tratamento_recebido = case_when(
+                is.na(tratamento_recebido) ~ lead(tratamento_recebido),
+                TRUE ~ tratamento_recebido
+              ))
             
             # Criando df_did com  Painel Balanceado (importante apenas para dif-in-dif)
             
