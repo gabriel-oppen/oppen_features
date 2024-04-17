@@ -22,6 +22,9 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                                         output_path
 ) {
   
+  
+  
+  
   # Criando controles
   
   controles <- character(length(vars_controle)) # criando lista de controles vazia
@@ -50,9 +53,10 @@ f_oppen_estima_ITT_LATE     <- function(dados,
             
             # Filtrando base para o Lee Bounds
             
-            if (tipo_metodo != "Nenhum") {
+            if (tipo_metodo != "Nenhum" & length(df[[var]][(df$tempo == 0) & (!is.na(df[[var]]))]) != 0) { # Aplicando Lee Bounds quando o nº de observações da variável de interesse em t0 não é igual a 0
               df <- dados %>% 
                 filter(tempo %in% c(t,0))
+              
               
               df_fractions <- df %>% # cria um df com nº de observações sem missings em cada tempo
                 group_by(tratamento, tempo) %>% 
@@ -137,10 +141,9 @@ f_oppen_estima_ITT_LATE     <- function(dados,
               df <- df %>% filter(!id %in% df_remover$id)
             } # Fim do Lee bounds
             
-            
-            if (tipo_metodo == "Nenhum") {
-              df <- dados
-              
+            else if (tipo_metodo == "Nenhum") {
+              df <- dados %>%
+                filter(tempo %in% c(0,t))
             }
             
             # Criando variáveis
@@ -150,44 +153,45 @@ f_oppen_estima_ITT_LATE     <- function(dados,
             df$var_cluster         <- df[[vars_cluster[c]]] 
             total_regs <- total_regs + 1
             
+            # Criando df_did com  Painel Balanceado (importante apenas para dif-in-dif)
+            
+            df_did <- df %>% 
+              group_by(id) %>% 
+              mutate(n_respostas = sum(!is.na(!!sym(var)))) %>%
+              ungroup() %>%
+              mutate(max_respostas = max(n_respostas),
+                     painel_balanceado = case_when(n_respostas == max_respostas ~ 1,
+                                                   n_respostas < max_respostas ~ 0,
+                                                   .default = NULL)) %>% 
+              ungroup() %>% 
+              filter(painel_balanceado == 1)
+            
+            # Criando variáveis de interação do dif-in-dif
+            df_did$tratamento_sorteado_x_tempo <- as.factor(df_did$tratamento_sorteado*df_did$tempo)
+            df_did$tratamento_recebido_x_tempo <- as.factor(df_did$tratamento_recebido*df_did$tempo)
             
             # Estimando ITT com variáveis e com erro padrão simples
-            model_ITT <- lm(df[[var]][tempo == t] ~ df$tratamento_sorteado[tempo == t] , data = df)
-            
-            if (!anyNA(df[[var]][df$tempo == 0])) { # quando a variável de resultado não tiver missings no baseline
-              model_ITT_DID <- lm(df[[var]][tempo == t] ~ df$tratamento_sorteado[tempo == t] + df[[var]][tempo == 0], data = df)
-            }
-            else {
-              formula_ITT_DID <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_sorteado[tempo == ", t, "] + ", paste0(var, "_ipt[tempo == 0] + ", paste0(var, "_mi[tempo == 0]"))))
-              model_ITT_DID <- lm(formula_ITT_DID, data = df)
-            }
+            model_ITT     <- lm(df[[var]][tempo == t] ~ df$tratamento_sorteado[tempo == t] , data = df)
+            model_ITT_DID <- lm(df_did[[var]] ~ tratamento_sorteado_x_tempo + tratamento_sorteado + tempo, data = df_did)
             
             formula_ITT_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_sorteado[tempo == ", t, "] + ", vars_controle))
-            model_ITT_control <- lm(formula_ITT_control, data = df)
+            model_ITT_control   <- lm(formula_ITT_control, data = df)
             
             # Estimando ITT com variáveis e com erro padrão robusto
             model_ITT_rob             <- coeftest(model_ITT, vcov = vcovCL(model_ITT, "HC1", cluster = df$var_cluster[df$tempo == 0]), save = TRUE)
-            model_ITT_DID_rob         <- coeftest(model_ITT_DID, vcov = vcovCL(model_ITT_DID, "HC1", cluster = df$var_cluster[df$tempo == 0]), save = TRUE)
+            model_ITT_DID_rob         <- coeftest(model_ITT_DID, vcov = vcovCL(model_ITT_DID, "HC1", cluster = df_did$var_cluster), save = TRUE)
             model_ITT_control_rob     <- coeftest(model_ITT_control, vcov = vcovCL(model_ITT_control, "HC1", cluster = df$var_cluster[df$tempo == 0]), save = TRUE)
             
             # Estimando LATE com variáveis e com erro padrão simples
             model_LATE     <- ivreg(df[[var]][tempo == t] ~ df$tratamento_recebido[tempo == t] | df$tratamento_sorteado[tempo == t] , data = df) # Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
-            
-            if (!anyNA(df[[var]][df$tempo == 0])) { # quando a variável de resultado não tiver missings no baseline
-              model_LATE_DID <- ivreg(df[[var]][tempo == t] ~ df$tratamento_recebido[tempo == t] + df[[var]][tempo == 0]  | df$tratamento_sorteado[tempo == t] + df[[var]][tempo == 0] , data = df)
-              
-            }
-            else {
-              model_LATE_DID <- ivreg(df[[var]][tempo == t] ~ df$tratamento_recebido[tempo == t] + df[[paste0(var,"_ipt")]][tempo == 0] + df[[paste0(var,"_mi")]][tempo == 0]  | df$tratamento_sorteado[tempo == t] + df[[paste0(var,"_ipt")]][tempo == 0] + df[[paste0(var,"_mi")]][tempo == 0] , data = df)
-              
-            }
+            model_LATE_DID <- ivreg(df_did[[var]] ~ tratamento_recebido_x_tempo + tratamento_recebido + tempo  | tratamento_sorteado_x_tempo + tratamento_sorteado + tempo, data = df_did)
             
             formula_LATE_control <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_recebido[tempo == ", t, "] + ", vars_controle, " | ", "tratamento_sorteado[tempo == ", t, "] + ", vars_controle))
             model_LATE_control   <- ivreg(formula_LATE_control, data = df)
             
             # Estimando LATE com variáveis e com erro padrão robusto
             model_LATE_rob             <- coeftest(model_LATE, vcov = vcovCL(model_LATE, "HC1", cluster = df$var_cluster[df$tempo == 0]), save = TRUE)
-            model_LATE_DID_rob         <- coeftest(model_LATE_DID, vcov = vcovCL(model_LATE_DID, "HC1", cluster = df$var_cluster[df$tempo == 0]), save = TRUE)
+            model_LATE_DID_rob         <- coeftest(model_LATE_DID, vcov = vcovCL(model_LATE_DID, "HC1", cluster = df_did$var_cluster), save = TRUE)
             model_LATE_control_rob     <- coeftest(model_LATE_control, vcov = vcovCL(model_LATE_control, "HC1", cluster = df$var_cluster[df$tempo == 0]), save = TRUE)
             
             # Adicionando resultados em um dataframe
