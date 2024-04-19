@@ -51,6 +51,8 @@ f_oppen_estima_ITT_LATE     <- function(dados,
             var              <- vars_resultado[i]
             var_trat_receb   <- var_tratamento_recebido[w]
             
+            dados$var_resultado <- dados[[var]] # variável de resultado do loop
+            
             
             # Filtrando base para o Lee Bounds
             
@@ -81,7 +83,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                   menor_atrito = 0
                 }
                 
-                dados_menoratrito <- subset(df, tratamento == menor_atrito & tempo == t)
+                dados_menoratrito <- subset(df, tratamento == menor_atrito & tempo == t & !is.na(var_resultado))
                 
                 # Definindo número para remover
                 n_remover <- round(nrow(dados_menoratrito) * trimming_fraction, 0)
