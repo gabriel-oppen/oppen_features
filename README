@@ -1,4 +1,3 @@
----
 
 # ITT and LATE Estimation Function
 
@@ -41,4 +40,3 @@ f_oppen_estima_ITT_LATE(dados, vars_controle, vars_resultado,
 
 Ensure that your dataset and variable names match the parameters provided to the function. Additionally, review the output for meaningful interpretation of treatment effects.
 
----
