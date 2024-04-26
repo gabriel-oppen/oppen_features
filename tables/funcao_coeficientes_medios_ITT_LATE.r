@@ -65,7 +65,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
   vars_controle <- paste(controles, collapse = " + ") # putting a '+' between the variables
   
   dados_final <- data.frame() # dataframe vazio para armazenar resultados do loop
-  for (tipo_metodo in c("Nenhum", "Lee Bounds - Upper", "Lee Bounds - Lower", "IPW - manual")) { 
+  for (tipo_metodo in c("IPW - manual", "Nenhum", "Lee Bounds - Upper", "Lee Bounds - Lower")) { 
     for (t in unique(dados$tempo)) {
       
       for (i in seq_along(vars_resultado)) {
@@ -78,7 +78,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
               
               for(tipo_estimador in c("ITT","LATE")) {
                 
-                for(tipo_regressao in c("Diferença de Médias","Diferença em Diferenças")) {
+                for(tipo_regressao in c("Diferença em Diferenças","Diferença de Médias")) {
                   
                   for(tipo_controle in c("não", "sim")) {
                     
@@ -250,14 +250,17 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                     
                     # Gerando pesos do IPW
                     if (tipo_metodo == "IPW - manual") {
-                      ## Fit a logistic regression model
-                      formula_ipw     <- formula(paste("df[[var_tratamento_sorteado]][df$tempo == baseline] ~ ", vars_controle))
-                      model_IPW       <- glm(formula_ipw, data = df, family = binomial)
+
+                      ## Mantendo só a linha de base nesse dataframe
+                      df_t0 <- df %>% filter(tempo == baseline & !is.na(var_resultado)) 
                       
-                      ## Predict probabilities
-                      df_t0 <- df %>% filter(tempo == baseline) # mantendo só a linha de base nesse dataframe
+                      ## Criando modelo de regressão logística para estimar a probabilidade de receber o tratamento no baseline com base em observáveis
+                      formula_ipw     <- formula(paste("df_t0[[var_tratamento_sorteado]][df_t0$tempo == baseline] ~ ", vars_controle))
+                      model_IPW       <- glm(formula_ipw, data = df_t0, family = binomial)
+                      
+                      ## Criando variável com a probabilidade
                       df_t0$prob_treatment = predict(model_IPW, type = "response")
-                      
+                      ## Criando pesos
                       df_t0 <- df_t0 %>%
                         mutate(psweight = case_when(
                           tratamento == 1 ~ 1 / prob_treatment,
