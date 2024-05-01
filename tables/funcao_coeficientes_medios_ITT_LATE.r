@@ -78,9 +78,9 @@ f_oppen_estima_ITT_LATE     <- function(dados,
               
               for(tipo_estimador in c("ITT","LATE")) {
                 
-                for(tipo_regressao in c("Diferença em Diferenças","Diferença de Médias")) {
+                for(tipo_regressao in c("Diferença de Médias", "Diferença em Diferenças")) {
                   
-                  for(tipo_controle in c("não", "sim")) {
+                  for(tipo_controle in c("sim", "não")) {
                     
                     # Definindo parâmetros do loop
                     var              <- vars_resultado[i]
@@ -249,7 +249,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                     
                     
                     # Gerando pesos do IPW
-                    if (tipo_metodo == "IPW - manual") {
+                    if (tipo_metodo == "IPW - manual" & nrow(df[(df$tempo == baseline) & !is.na(df$var_resultado), ]) > 0) { # não rodando quando a variável só tem missings
 
                       ## Mantendo só a linha de base nesse dataframe
                       df_t0 <- df %>% filter(tempo == baseline & !is.na(var_resultado)) 
@@ -269,7 +269,11 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         )) %>% 
                         reframe(id, psweight)
                       
-                      df     <- left_join(df, df_t0, by = "id")
+                      df     <- left_join(df, df_t0, by = "id")#, relationship = "many-to-one")
+                      
+                      
+                      
+                      
                       df_did <- left_join(df_did, df_t0, by = "id")
                       
                       # Definindo pesos
@@ -277,7 +281,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                       weight     = df$psweight[df$tempo == t]
                       weight_did = df_did$psweight
                     }
-                    if (tipo_metodo != "IPW - manual") {
+                    if (tipo_metodo != "IPW - manual" | nrow(df[(df$tempo == baseline) & !is.na(df$var_resultado), ]) == 0) {
                       weight = NULL
                       weight_did = NULL
                     }
@@ -303,7 +307,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                     
                     ## caso 2: se é VERDADEIRO que a variável de resultado NÂO tem valores válidos quando o tempo for igual ao baseline
                     
-                    if (all(is.na(unique(df[df$tempo == baseline, ][[var]])) & df$tempo == baseline)) {
+                    if (all(is.na(mean(unique(df[df$tempo == baseline, ][[var]]), na.rm =  TRUE)) & t == baseline)) {
                       
                       condicao_2 = 1
                     }
@@ -325,7 +329,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                             model   <- lm(formula, data = df, weights = weight)
                           }
                         }
-                        if (tipo_estimador == "LATE"){
+                        if (tipo_estimador == "LATE" & t != 0){
                           if (var_trat_receb != var) {
                             if(tipo_controle == "não"){
                               model <- ivreg(df[[var]][tempo == t] ~ tratamento_recebido[tempo == t] + tratamento_dummy_recebido[df$tempo == baseline] + hetero_dummy[df$tempo == baseline] | tratamento_sorteado[tempo == t] + tratamento_dummy_sorteado[df$tempo == baseline] + hetero_dummy[df$tempo == baseline], data = df, weights = weight) # Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
@@ -351,7 +355,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         if(tipo_estimador == "ITT") {
                           model <- lm(df_did[[var]] ~ tratamento_sorteado_x_tempo + tratamento_sorteado + tempo + tratamento_dummy_sorteado + hetero_dummy, data = df_did, weights = weight_did)
                         }
-                        if(tipo_estimador == "LATE") {
+                        if(tipo_estimador == "LATE" & t != 0) {
                           if (var_trat_receb != var) {
                             model <- ivreg(df_did[[var]] ~ tratamento_recebido_x_tempo + tratamento_recebido + tempo + tratamento_dummy_recebido + hetero_dummy | tratamento_sorteado_x_tempo + tratamento_sorteado + tempo + tratamento_dummy_sorteado + hetero_dummy, data = df_did, weights = weight_did)
                           }
@@ -370,6 +374,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                       }
                       
                       # Adicionando resultados em um dataframe
+                      # Adicionando resultados em um dataframe
                       if(!is.null(model)){
                         dados_resultados <- data.frame(
                           variavel    = var,
@@ -387,18 +392,33 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                           metodo_atrito_nao_aleatorio = tipo_metodo
                         )
                         
+                        # adicionando intervalo de confiança
                         dados_resultados <- dados_resultados %>% 
                           mutate(
                             ic_baixo = efeito - qt(0.95, n_obs - 1) * erro_padrao,
                             ic_cima  = efeito + qt(0.95, n_obs - 1) * erro_padrao
                           )
                         
+                        # adicionando variáveis para análise de heterogeneidade
+                        if (var_hete != "não") {
+                          dados_resultados <- dados_resultados %>% 
+                            mutate(
+                              efeito_tratamento = model$coefficients[[3]],
+                              efeito_interacao  = efeito,
+                              efeito_caracteristica = model$coefficients[[4]],
+                              p_val_tratamento = model_rob[nrow(model_rob) * 3 + 3],
+                              p_val_interacao  = p_val,
+                              p_val_caracteristica = model_rob[nrow(model_rob) * 3 + 4],
+                              prop_amostra = nrow(df[df$hetero_dummy == 1, ]) / nrow(df)
+                            )
+                        }
+                        
                         dados_final <- bind_rows(dados_final, dados_resultados) # juntando dataframes
                         total_regs <- total_regs + 1
-                        dados_final <- dados_final %>% reframe(tempo,variavel,estimador,n_obs,efeito, ic_baixo, ic_cima, erro_padrao,p_val, metodo, controles,tratamento_completo, heterogeneidade, metodo_atrito_nao_aleatorio, cluster)
+                        #dados_final <- dados_final %>% reframe(tempo,variavel,estimador,n_obs,efeito, ic_baixo, ic_cima, erro_padrao,p_val, metodo, controles,tratamento_completo, heterogeneidade, metodo_atrito_nao_aleatorio, cluster)
                         
                       }
-                      
+                      model <- NULL
                     }
                   }
                 }
