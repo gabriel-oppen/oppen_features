@@ -96,6 +96,8 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                       
                       dados$var_resultado <- dados[[var]] # variável de resultado do loop
                       
+
+                      
                       # Filtrando base para o Lee Bounds
                       
                       if (tipo_metodo %in% c("Lee Bounds - Upper","Lee Bounds - Lower") & length(dados[[var]][(dados$tempo == baseline) & (!is.na(dados[[var]]))]) != 0 )  { # & !is.na(var_tempo). Aplicando Lee Bounds quando o nº de observações da variável de interesse no baseline não é igual a 0 e quando existe variável de tempo (ou seja, quando temos informações anteriores ao tratamento)
@@ -225,20 +227,20 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                       ## Variáveis de tratamento heterogêneo
                       
                       df$tratamento_dummy_sorteado    <- df[[var_tratamento_sorteado]]
+                      df$tratamento_dummy_sorteado    <- df[[var_tratamento_sorteado]]*df$hetero_dummy
                       df$tratamento_dummy_recebido    <- df$tratamento_recebido
                       df$tratamento_recebido          <- df$tratamento_recebido*df$hetero_dummy
                       
-                      ## Variável de estrato
+                      # Definindo estrato
                       
                       if(tipo_estrato == "sim" & !is.null(var_estrato)){
                         df$estrato_definido <- df[[var_estrato]]
                         lista_controles <- paste0(vars_controle, " + ", var_estrato, "[tempo == baseline]")
-                        }
+                      }
                       if(tipo_estrato == "não" | is.null(var_estrato)){
                         df$estrato_definido <- 1
                         lista_controles <- vars_controle
                       }
-                      
                       
                       # Criando df_did com  Painel Balanceado (importante apenas para dif-in-dif)
 
@@ -254,7 +256,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         filter(painel_balanceado == 1)
                       
                       # Gerando pesos do IPW
-                      if (tipo_metodo == "IPW - manual" & nrow(df[(df$tempo == baseline) & !is.na(df$var_resultado), ]) > 0 & tipo_controle == "sim") { # não rodando quando a variável só tem missings
+                      if (tipo_metodo == "IPW - manual" & nrow(df[(df$tempo == baseline) & !is.na(df$var_resultado), ]) > 0) { # não rodando quando a variável só tem missings
                         
                         ## Mantendo só a linha de base nesse dataframe
                         df_t0 <- df %>% filter(tempo == baseline & !is.na(var_resultado)) 
@@ -277,14 +279,13 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         df     <- left_join(df, df_t0, by = "id")#, relationship = "many-to-one")
                         df_did <- left_join(df_did, df_t0, by = "id")
                         
-                        model_IPW <- NULL # reiniciando modelo
-                        
                         # Definindo pesos
                         
                         weight     = df$psweight[df$tempo == t]
                         weight_did = df_did$psweight
                       }
-                      if (tipo_metodo != "IPW - manual" | nrow(df[(df$tempo == baseline) & !is.na(df$var_resultado), ]) == 0) {
+                      #if (tipo_metodo != "IPW - manual" | nrow(df[(df$tempo == baseline) & !is.na(df$var_resultado), ]) == 0) {
+                      else {
                         weight = NULL
                         weight_did = NULL
                       }
@@ -323,7 +324,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         if (tipo_regressao == "Diferença de Médias") {
                           if (tipo_estimador == "ITT") {
                             if(tipo_controle == "não"){
-                              model <- lm(df[[var]][tempo == t] ~ df$tratamento_sorteado[tempo == t] + tratamento_dummy_sorteado[df$tempo == baseline] + df$hetero_dummy[df$tempo == baseline] + df$estrato_definido[df$tempo == baseline], data = df, weights = weight)
+                              model <- lm(df[[var]][tempo == t] ~ df$tratamento_sorteado[tempo == t] + df$tratamento_dummy_sorteado[tempo == baseline] + df$hetero_dummy[tempo == baseline] + df$estrato_definido[tempo == baseline], data = df, weights = weight)
                             }
                             if(tipo_controle == "sim"){
                               formula <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_sorteado[tempo == ", t, "] + tratamento_dummy_sorteado[tempo == baseline] + hetero_dummy[tempo == baseline] + ", lista_controles))
@@ -333,7 +334,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                           if (tipo_estimador == "LATE" & t != 0){
                             if (var_trat_receb != var) {
                               if(tipo_controle == "não"){
-                                model <- ivreg(df[[var]][tempo == t] ~ tratamento_recebido[tempo == t] + tratamento_dummy_recebido[df$tempo == baseline] + hetero_dummy[df$tempo == baseline] + df$estrato_definido[df$tempo == baseline]| tratamento_sorteado[tempo == t] + tratamento_dummy_sorteado[df$tempo == baseline] + hetero_dummy[df$tempo == baseline] + df$estrato_definido[df$tempo == baseline], data = df, weights = weight) # Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
+                                model <- ivreg(df[[var]][tempo == t] ~ tratamento_recebido[tempo == t] + tratamento_dummy_recebido[tempo == baseline] + hetero_dummy[tempo == baseline] + estrato_definido[tempo == baseline] | tratamento_sorteado[tempo == t] + tratamento_dummy_sorteado[tempo == baseline] + hetero_dummy[tempo == baseline] + estrato_definido[tempo == baseline], data = df, weights = weight) # Para o teste Weak-instrument um p-valor baixo indica que há forte evidência contra a hipótese nula de que os instrumentos são fracos. Isso sugere que os instrumentos são relevantes para a variável instrumental, o que é desejável. O teste de Wu-Hausman é usado para testar a consistência dos estimadores IV em relação aos estimadores OLS. Um p-valor alto indica que não há evidências significativas para rejeitar a hipótese nula de consistência entre os estimadores IV e OLS. Isso sugere que o modelo IV pode ser consistente com o modelo OLS.
                               }
                               if(tipo_controle == "sim"){
                                 formula <- formula(paste0(var, "[tempo == ", t, "] ~ tratamento_recebido[tempo == ", t, "] + tratamento_dummy_recebido[df$tempo == baseline] + hetero_dummy[df$tempo == baseline] + ", lista_controles, " | ", "tratamento_sorteado[tempo == ", t, "] + tratamento_dummy_sorteado[df$tempo == baseline] + hetero_dummy[df$tempo == baseline] + ", lista_controles))
@@ -354,7 +355,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         }
                         if (tipo_regressao == "Diferença em Diferenças" & length(unique(df$tempo)) >= 2)  {  # apenas aplica dif-in-dif para dataframes que têm mais de um período de tempo
                           if(tipo_estimador == "ITT") {
-                            model <- lm(df_did[[var]] ~ tratamento_sorteado_x_tempo + tratamento_sorteado + tempo + tratamento_dummy_sorteado + hetero_dummy + estrato_definido , data = df_did, weights = weight_did)
+                            model <- lm(df_did[[var]] ~ tratamento_sorteado_x_tempo + tratamento_sorteado + tempo + tratamento_dummy_sorteado + hetero_dummy + estrato_definido, data = df_did, weights = weight_did)
                           }
                           if(tipo_estimador == "LATE" & t != 0) {
                             if (var_trat_receb != var) {
@@ -370,14 +371,11 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                           }
                           
                         }
-                        
                         if (tipo_regressao == "Diferença em Diferenças" & (length(unique(df$tempo)) < 2 | tipo_controle == "sim")){ # não rodar modelo dif-in-dif quando tem controles e quando tem menos de um tempo
                           model <- NULL
                         }
-                        if (tipo_metodo == "IPW - manual" & tipo_controle == "não") { 
-                          model <- NULL
-                        }
                         
+                        # Adicionando resultados em um dataframe
                         # Adicionando resultados em um dataframe
                         if(!is.null(model)){
                           dados_resultados <- data.frame(
