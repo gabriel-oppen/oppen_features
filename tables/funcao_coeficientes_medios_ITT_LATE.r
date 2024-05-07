@@ -26,7 +26,8 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                                         vars_cluster = NULL,            # variável de cluster
                                         var_heterogeneo = NULL,         # variável efeitos heterogêneos
                                         var_id          = NULL,         # variável de ID do nível da observação
-                                        output_path
+                                        output_path,
+                                        nome_arquivo                    # nome do arquivo gerado
 ) {
   
   # Definindo tempos
@@ -95,8 +96,6 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                       var_hete         <- var_heterogeneo[h]
                       
                       dados$var_resultado <- dados[[var]] # variável de resultado do loop
-                      
-
                       
                       # Filtrando base para o Lee Bounds
                       
@@ -243,7 +242,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                       }
                       
                       # Criando df_did com  Painel Balanceado (importante apenas para dif-in-dif)
-
+                      
                       df_did <- df %>% 
                         group_by(id) %>% 
                         mutate(n_respostas = sum(!is.na(!!sym(var)))) %>%
@@ -294,7 +293,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                       # Criando variáveis de interação do dif-in-dif
                       df_did$tratamento_sorteado_x_tempo <- as.factor(df_did$tratamento_sorteado*df_did$tempo)
                       df_did$tratamento_recebido_x_tempo <- as.factor(df_did$tratamento_recebido*df_did$tempo)
-
+                      
                       # Definindo casos em que não iremos rodar os modelos
                       
                       ## caso 1: se é VERDADEIRO que, sendo Lee Bounds, a variável NÂO tem observações válidas na linha de base
@@ -376,7 +375,6 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         }
                         
                         # Adicionando resultados em um dataframe
-                        # Adicionando resultados em um dataframe
                         if(!is.null(model)){
                           dados_resultados <- data.frame(
                             variavel    = var,
@@ -418,7 +416,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                           
                           dados_final <- bind_rows(dados_final, dados_resultados) # juntando dataframes
                           total_regs <- total_regs + 1
-
+                          
                         }
                         model <- NULL
                       }
@@ -432,10 +430,11 @@ f_oppen_estima_ITT_LATE     <- function(dados,
       }
     }
   }
+  
   # Organizando
   dados_final <- dados_final %>% arrange(desc(tempo), desc(controles), desc(variavel), estimador)
   # Salvando
-  write_xlsx(dados_final, path = paste0(output_path, "/tabelas/coef_todos_ITT_LATE.xlsx"))
+  write_xlsx(dados_final, path = paste0(output_path,nome_arquivo,".xlsx"))
   
   # Terminando relógio para saber quanto tempo demorou para rodar
   end_time <- Sys.time()
