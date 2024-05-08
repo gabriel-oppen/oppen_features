@@ -66,7 +66,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
   vars_controle <- paste(controles, collapse = " + ") # putting a '+' between the variables
   
   dados_final <- data.frame() # dataframe vazio para armazenar resultados do loop
-  for (tipo_metodo in c("IPW - manual", "Nenhum", "Lee Bounds - Upper", "Lee Bounds - Lower")) { 
+  for (tipo_metodo in c("Nenhum", "IPW - manual",  "Lee Bounds - Upper", "Lee Bounds - Lower")) { 
     for (t in unique(dados$tempo)) {
       
       for (i in seq_along(vars_resultado)) {
@@ -81,9 +81,9 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                 
                 for(tipo_regressao in c("Diferença de Médias", "Diferença em Diferenças")) {
                   
-                  for(tipo_controle in c("sim", "não")) {
+                  for(tipo_controle in c("não", "sim")) {
                     
-                    for(tipo_estrato in c("sim", "não")) {
+                    for(tipo_estrato in c("não", "sim")) {
                       
                       # Definindo parâmetros do loop
                       var              <- vars_resultado[i]
@@ -226,7 +226,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                       ## Variáveis de tratamento heterogêneo
                       
                       df$tratamento_dummy_sorteado    <- df[[var_tratamento_sorteado]]
-                      df$tratamento_dummy_sorteado    <- df[[var_tratamento_sorteado]]*df$hetero_dummy
+                      df$tratamento_sorteado          <- df[[var_tratamento_sorteado]]*df$hetero_dummy
                       df$tratamento_dummy_recebido    <- df$tratamento_recebido
                       df$tratamento_recebido          <- df$tratamento_recebido*df$hetero_dummy
                       
