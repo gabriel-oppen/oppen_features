@@ -382,6 +382,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                               variavel    = var,
                               efeito      = model$coefficients[[2]],
                               erro_padrao = model_rob[nrow(model_rob) + 2],
+                              desvio_padrao_controle_baseline = sd(df[df$tratamento == 0 & df$tempo == baseline, var], na.rm = TRUE),
                               n_obs       = nrow(model[["model"]]),
                               p_val       = model_rob[nrow(model_rob) * 3 + 2],
                               estimador   = tipo_estimador,
@@ -399,21 +400,23 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                             # adicionando intervalo de confiança
                             dados_resultados <- dados_resultados %>% 
                               mutate(
+                                efeito = case_when(medida == "múltiplos do desvio padrão" ~ efeito / desvio_padrao_controle_baseline,
+                                                   medida == "pontos percentuais" ~ efeito),
+                                erro_padrao = case_when(medida == "múltiplos do desvio padrão" ~ erro_padrao / desvio_padrao_controle_baseline,
+                                                   medida == "pontos percentuais" ~ erro_padrao),
                                 ic_baixo = efeito - qt(0.95, n_obs - 1) * erro_padrao,
-                                ic_cima  = efeito + qt(0.95, n_obs - 1) * erro_padrao,
-                                efeito = case_when(medida == "múltiplos do desvio padrão" ~ efeito / mean(df[df$tratamento == 0 & df$tempo == baseline, var], na.rm = TRUE),
-                                                   medida == "pontos percentuais" ~ efeito) 
+                                ic_cima  = efeito + qt(0.95, n_obs - 1) * erro_padrao
                               )
                             
                             # adicionando variáveis para análise de heterogeneidade
                             if (var_hete != "não") {
                               dados_resultados <- dados_resultados %>% 
                                 mutate(
-                                  efeito_tratamento = case_when(medida == "múltiplos do desvio padrão" ~ model$coefficients[[3]] / mean(df[df$tratamento == 0 & df$tempo == baseline, var], na.rm = TRUE),
+                                  efeito_tratamento = case_when(medida == "múltiplos do desvio padrão" ~ model$coefficients[[3]] / desvio_padrao_controle_baseline,
                                                                 medida == "pontos percentuais" ~ model$coefficients[[3]]),
-                                  efeito_interacao  = case_when(medida == "múltiplos do desvio padrão" ~ efeito / mean(df[df$tratamento == 0 & df$tempo == baseline, var], na.rm = TRUE),
+                                  efeito_interacao  = case_when(medida == "múltiplos do desvio padrão" ~ efeito / desvio_padrao_controle_baseline,
                                                                 medida == "pontos percentuais" ~ efeito),
-                                  efeito_caracteristica = case_when(medida == "múltiplos do desvio padrão" ~ model$coefficients[[4]] / mean(df[df$tratamento == 0 & df$tempo == baseline, var], na.rm = TRUE),
+                                  efeito_caracteristica = case_when(medida == "múltiplos do desvio padrão" ~ model$coefficients[[4]] / desvio_padrao_controle_baseline,
                                                                     medida == "pontos percentuais" ~ model$coefficients[[4]]),
                                   p_val_tratamento = model_rob[nrow(model_rob) * 3 + 3],
                                   p_val_interacao  = p_val,
