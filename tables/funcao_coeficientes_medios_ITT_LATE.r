@@ -382,7 +382,6 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                               variavel    = var,
                               efeito      = model$coefficients[[2]],
                               erro_padrao = model_rob[nrow(model_rob) + 2],
-                              desvio_padrao_controle_baseline = sd(df[df$tratamento == 0 & df$tempo == baseline, var], na.rm = TRUE),
                               n_obs       = nrow(model[["model"]]),
                               p_val       = model_rob[nrow(model_rob) * 3 + 2],
                               estimador   = tipo_estimador,
@@ -397,9 +396,12 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                               medida_coef = medida
                             )
                             
-                            # adicionando intervalo de confiança
+                            # adicionando efeito em múltiplos do desvio padrão e intervalo de confiança
                             dados_resultados <- dados_resultados %>% 
                               mutate(
+                                desvio_padrao_controle_baseline = case_when(baseline != 0 ~ sd(df$var_resultado[df$tratamento == 0 & df$tempo == baseline], na.rm = TRUE),
+                                                                            baseline == 0 & is.na(mean(unique(df[df$tempo == baseline, ][[var]]), na.rm =  TRUE)) ~ sd(df$var_resultado[df$tratamento == 0 & df$tempo == 1], na.rm = TRUE), # Para as variáveis que não têm t=0, usará o desvio padrão do controle em t=1
+                                                                            baseline == 0 ~ sd(df$var_resultado[df$tempo == baseline], na.rm = TRUE)),
                                 efeito = case_when(medida == "múltiplos do desvio padrão" ~ efeito / desvio_padrao_controle_baseline,
                                                    medida == "pontos percentuais" ~ efeito),
                                 erro_padrao = case_when(medida == "múltiplos do desvio padrão" ~ erro_padrao / desvio_padrao_controle_baseline,
