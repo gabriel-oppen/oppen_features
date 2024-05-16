@@ -266,7 +266,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                           filter(painel_balanceado == 1)
                         
                         # Gerando pesos do IPW
-                        if (tipo_metodo == "IPW - manual" & nrow(df[(df$tempo == baseline) & !is.na(df$var_resultado), ]) > 0) { # não rodando quando a variável só tem missings
+                        if (tipo_metodo == "IPW - manual" & nrow(df[(df$tempo == baseline) & !is.na(df[[var]]), ]) > 0) { # não rodando quando a variável só tem missings
                           
                           ## Mantendo só a linha de base nesse dataframe
                           df_t0 <- df %>% filter(tempo == baseline & !is.na(var_resultado)) 
