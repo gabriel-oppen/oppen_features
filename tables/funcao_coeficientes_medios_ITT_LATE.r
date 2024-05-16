@@ -50,7 +50,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
   }
   
   # Apendando variável "não" à lista de variáveis heterogênas
-  var_heterogeneo <- c(var_heterogeneo, "não")
+  var_heterogeneo <- c(var_heterogeneo, "não", "abaixo_p25", "acima_p75")
   
   # Definindo variável de tratamento efetivo
   var_tratamento_recebido <- c(var_tratamento_recebido, "não")
@@ -208,6 +208,14 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         df$var_cluster         <- df[[vars_cluster[c]]]
                         
                         ## Variáveis de efeito heterogêno
+                        
+                        # Criando quartis
+                        q1 <- quantile(df[[var]], probs = 0.25, na.rm = TRUE)
+                        q3 <- quantile(df[[var]], probs = 0.75, na.rm = TRUE)
+                        df$abaixo_p25 <- ifelse(df[[var]] < q1, 1, 0)
+                        df$acima_p75 <- ifelse(df[[var]] > q3, 1, 0)
+                        
+                        
                         if (var_hete == "não") {
                           df$hetero_dummy <- 1
                         }
@@ -423,7 +431,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                                   p_val_tratamento = model_rob[nrow(model_rob) * 3 + 3],
                                   p_val_interacao  = p_val,
                                   p_val_caracteristica = model_rob[nrow(model_rob) * 3 + 4],
-                                  prop_amostra = nrow(df[df$hetero_dummy == 1, ]) / nrow(df)
+                                  prop_amostra = nrow(df[df$hetero_dummy == 1 & !is.na(df$var_resultado), ]) / nrow(df[!is.na(df$var_resultado), ])
                                 )
                             }
                             
