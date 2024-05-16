@@ -50,7 +50,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
   }
   
   # Apendando variável "não" à lista de variáveis heterogênas
-  var_heterogeneo <- c(var_heterogeneo, "não", "abaixo_p25", "acima_p75")
+  var_heterogeneo <- c(var_heterogeneo, "não")#, "abaixo_p25", "acima_p75")
   
   # Definindo variável de tratamento efetivo
   var_tratamento_recebido <- c(var_tratamento_recebido, "não")
@@ -66,7 +66,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
   vars_controle <- paste(controles, collapse = " + ") # putting a '+' between the variables
   
   dados_final <- data.frame() # dataframe vazio para armazenar resultados do loop
-  for (tipo_metodo in c("Nenhum", "IPW - manual",  "Lee Bounds - Upper", "Lee Bounds - Lower")) { 
+  for (tipo_metodo in c("Lee Bounds - Upper","Lee Bounds - Lower","Nenhum", "IPW - manual")) { 
     for (t in unique(dados$tempo)) {
       
       for (i in seq_along(vars_resultado)) {
@@ -209,14 +209,15 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         
                         ## Variáveis de efeito heterogêno
                         
-                        # Criando quartis
-                        q1 <- quantile(df[[var]], probs = 0.25, na.rm = TRUE)
-                        q3 <- quantile(df[[var]], probs = 0.75, na.rm = TRUE)
-                        df$abaixo_p25 <- ifelse(df[[var]] < q1, 1, 0)
-                        df$acima_p75 <- ifelse(df[[var]] > q3, 1, 0)
+                      #  # Criando quartis
+                      #  
+                      #  q1 <- quantile(df[df$tempo == baseline, ]$var_resultado, probs = 0.25, na.rm = TRUE)
+                      #  q3 <- quantile(df[df$tempo == baseline, ]$var_resultado, probs = 0.75, na.rm = TRUE)
+                      #  df$abaixo_p25 <- ifelse(df$var_resultado < q1, 1, 0)
+                      #  df$acima_p75 <- ifelse(df$var_resultado > q3, 1, 0)
+                      #  
                         
-                        
-                        if (var_hete == "não") {
+                        if (var_hete == "não" ) { #| is.null(df[[var_hete]])
                           df$hetero_dummy <- 1
                         }
                         else {
