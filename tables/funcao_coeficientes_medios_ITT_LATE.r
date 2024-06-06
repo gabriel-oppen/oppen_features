@@ -18,6 +18,7 @@ start_time <- Sys.time()
 # Função para estimar e salvar resultados
 f_oppen_estima_ITT_LATE     <- function(dados,
                                         vars_controle,
+                                        vars_controle_ipw,              # variáveis que serão usadas para calcular o peso do IPW
                                         var_estrato = NULL,
                                         vars_resultado,
                                         var_tratamento_sorteado,        # tratamento atribuído pelo sorteio. Tem que ser Dummy 
@@ -57,16 +58,21 @@ f_oppen_estima_ITT_LATE     <- function(dados,
   
   # Criando controles
   
-  controles <- character(length(vars_controle)) # criando lista de controles vazia
+  controles     <- character(length(vars_controle)) # criando lista de controles vazia
+  controles_ipw <- character(length(vars_controle_ipw)) # criando lista de controles vazia
   
   for (i in seq_along(vars_controle)) {
-    controles[i] <- paste0( vars_controle[i], "[tempo == baseline]") # adicionando os controles na lista
+    controles[i]         <- paste0(vars_controle[i], "[tempo == baseline]") # adicionando os controles na lista
+  }
+  for (i in seq_along(vars_controle_ipw)) {
+    controles_ipw[i] <- paste0(vars_controle_ipw[i], "[tempo == baseline]") # adicionando os controles na lista
   }
   
-  vars_controle <- paste(controles, collapse = " + ") # putting a '+' between the variables
+  vars_controle     <- paste(controles, collapse = " + ") # putting a '+' between the variables
+  vars_controle_ipw <- paste(controles_ipw, collapse = " + ")
   
   dados_final <- data.frame() # dataframe vazio para armazenar resultados do loop
-  for (tipo_metodo in c("Lee Bounds - Upper","Lee Bounds - Lower","Nenhum", "IPW - manual")) { 
+  for (tipo_metodo in c("IPW - manual","Lee Bounds - Upper","Lee Bounds - Lower","Nenhum")) { 
     for (t in unique(dados$tempo)) {
       
       for (i in seq_along(vars_resultado)) {
@@ -245,11 +251,13 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         
                         if(tipo_estrato == "sim" & !is.null(var_estrato)){
                           df$estrato_definido <- df[[var_estrato]]
-                          lista_controles <- paste0(vars_controle, " + ", var_estrato, "[tempo == baseline]")
+                          lista_controles     <- paste0(vars_controle, " + ", var_estrato, "[tempo == baseline]")
+                          lista_controles_ipw <- paste0(vars_controle_ipw, " + ", var_estrato, "[tempo == baseline]")
                         }
                         if(tipo_estrato == "não" | is.null(var_estrato)){
                           df$estrato_definido <- 1
-                          lista_controles <- vars_controle
+                          lista_controles     <- vars_controle
+                          lista_controles_ipw <- vars_controle_ipw
                         }
                         
                         # Criando df_did com  Painel Balanceado (importante apenas para dif-in-dif)
@@ -266,24 +274,37 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                           filter(painel_balanceado == 1)
                         
                         # Gerando pesos do IPW
-                        if (tipo_metodo == "IPW - manual" & nrow(df[(df$tempo == baseline) & !is.na(df[[var]]), ]) > 0) { # não rodando quando a variável só tem missings
+                        if (tipo_metodo == "IPW - manual" & t > 0) { # não rodando quando a variável só tem missings
                           
-                          ## Mantendo só a linha de base nesse dataframe
-                          df_t0 <- df %>% filter(tempo == baseline & !is.na(var_resultado)) 
+                          # Criando variável de atrito por variável de resultado
+                          df <- df %>%
+                            mutate(atrito_var = case_when(
+                              tempo > 0 & is.na(var_resultado) ~ 1,
+                              tempo > 0 & !is.na(var_resultado) ~ 0,
+                              TRUE ~ NA_real_ 
+                            ))
+                          # Copiando valor da variável de atrito entre IDs
+                          df <- df %>%
+                            group_by(id) %>%
+                            mutate(atrito_var = case_when(
+                              tempo == 0 ~ lead(atrito_var),
+                              TRUE ~ atrito_var
+                            )) %>%
+                            ungroup()
                           
-                          ## Criando modelo de regressão logística para estimar a probabilidade de receber o tratamento no baseline com base em observáveis
-                          formula_ipw     <- formula(paste("df_t0[[var_tratamento_sorteado]][df_t0$tempo == baseline] ~ ", lista_controles))
+                          df$nao_atrito_var <- 1 - df$atrito_var
+                          
+                          df_t0 <- df %>% filter(tempo == baseline) 
+                          
+                          ## Criando modelo de regressão logística para estimar a probabilidade de não atritar
+                          formula_ipw     <- formula(paste("nao_atrito_var ~ df_t0[[var_tratamento_sorteado]] + ", lista_controles_ipw))
                           model_IPW       <- glm(formula_ipw, data = df_t0, family = binomial)
                           
                           ## Criando variável com a probabilidade
-                          df_t0$prob_treatment = predict(model_IPW, type = "response")
+                          df_t0$phat = predict(model_IPW, type = "response")
                           ## Criando pesos
                           df_t0 <- df_t0 %>%
-                            mutate(psweight = case_when(
-                              tratamento == 1 ~ 1 / prob_treatment,
-                              tratamento == 0 ~ 1 / (1 - prob_treatment),
-                              TRUE ~ NA_real_  # Default case for any other condition
-                            )) %>% 
+                            mutate(psweight = 1 / phat) %>%   # Ou seja, quanto maior a probabilidade da pessoa atritar maior o seu peso. Assim, pessoas que tinham altas chances de atritar e não atritaram ficam com mais peso na amostra
                             reframe(id, psweight)
                           
                           df     <- left_join(df, df_t0, by = "id")#, relationship = "many-to-one")
@@ -464,5 +485,5 @@ f_oppen_estima_ITT_LATE     <- function(dados,
   execution_time <- end_time - start_time
   
   # gran finale
-  cat("Ihhaaaaaa! Em ", execution_time," segundos você gerou uma tabela top com resultados de", total_regs , "regressões!\n") 
+  cat("Ihhaaaaaa! Em ", execution_time," minutos você gerou uma tabela top com resultados de", total_regs , "regressões!\n") 
 }
