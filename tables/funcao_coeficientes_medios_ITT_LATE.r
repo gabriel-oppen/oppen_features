@@ -51,7 +51,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
   }
   
   # Apendando variável "não" à lista de variáveis heterogênas
-  var_heterogeneo <- c(var_heterogeneo, "não")#, "abaixo_p25", "acima_p75")
+  var_heterogeneo <- c("abaixo_p25","abaixo_p50", "acima_p75", "não", var_heterogeneo)
   
   # Definindo variável de tratamento efetivo
   var_tratamento_recebido <- c(var_tratamento_recebido, "não")
@@ -215,28 +215,61 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         
                         ## Variáveis de efeito heterogêno
                         
-                      #  # Criando quartis
-                      #  
-                      #  q1 <- quantile(df[df$tempo == baseline, ]$var_resultado, probs = 0.25, na.rm = TRUE)
-                      #  q3 <- quantile(df[df$tempo == baseline, ]$var_resultado, probs = 0.75, na.rm = TRUE)
-                      #  df$abaixo_p25 <- ifelse(df$var_resultado < q1, 1, 0)
-                      #  df$acima_p75 <- ifelse(df$var_resultado > q3, 1, 0)
-                      #  
+                        ## Criando quartis
                         
-                        if (var_hete == "não" ) { #| is.null(df[[var_hete]])
+                        if (is.null(var_tempo) | is.na(mean(unique(df[df$tempo == baseline, ][[var]]), na.rm =  TRUE))) { # quando é cross-section ou quando é painel mas a variável não tem valores válidos no Baseline
+                          
+                          q1 <- quantile(df[(df$tempo == t) & (df[[var_tratamento_sorteado]] == 0), ]$var_resultado, probs = 0.25, na.rm = TRUE)
+                          q2 <- quantile(df[(df$tempo == t) & (df[[var_tratamento_sorteado]] == 0), ]$var_resultado, probs = 0.50, na.rm = TRUE)                          
+                          q3 <- quantile(df[(df$tempo == t) & (df[[var_tratamento_sorteado]] == 0), ]$var_resultado, probs = 0.75, na.rm = TRUE)
+                          df$abaixo_p25 <- ifelse(df$var_resultado < q1, 1, 0)
+                          df$abaixo_p50 <- ifelse(df$var_resultado < q2, 1, 0)
+                          df$acima_p75  <- ifelse(df$var_resultado > q3, 1, 0)
+                        }
+                        else { # quando é painel
+                          
+                          q1 <- quantile(df[df$tempo == baseline, ]$var_resultado, probs = 0.25, na.rm = TRUE)
+                          q2 <- quantile(df[df$tempo == baseline, ]$var_resultado, probs = 0.50, na.rm = TRUE)
+                          q3 <- quantile(df[df$tempo == baseline, ]$var_resultado, probs = 0.75, na.rm = TRUE)
+                          
+                          
+                          df <- df %>% 
+                            mutate(
+                              abaixo_p25 = case_when(
+                                (var_resultado < q1 & tempo == baseline) ~ 1,
+                                (var_resultado >= q1 & tempo == baseline) ~ 0,
+                                .default = NA_real_),
+                              
+                              abaixo_p50 = case_when(
+                                (var_resultado < q2 & tempo == baseline) ~ 1,
+                                (var_resultado >= q2 & tempo == baseline) ~ 0,
+                                .default = NA_real_),
+                              
+                              acima_p75 = case_when(
+                                (var_resultado > q3 & tempo == baseline) ~ 1,
+                                (var_resultado <= q3 & tempo == baseline) ~ 0,
+                                .default = NA_real_)
+                            )
+                          
+                        }
+                        
+                        if (var_hete == "não" ) { 
                           df$hetero_dummy <- 1
                         }
                         else {
                           df$hetero_dummy <- df[[var_hete]]
                         }
                         
+                        # Substituindo variável de efeito heterogêneo pelo seu valor no baseline
                         if (!is.null(var_tempo)) {
                           
                           df <- df %>%
                             group_by(id) %>%
                             arrange(id, tempo) %>% 
-                            mutate(hetero_dummy = first(hetero_dummy),              # substituindo variável pelo seu valor no tempo 0
-                                   tratamento_recebido = last(tratamento_recebido)) %>%  # substituindo variável pelo seu valor no tempo 2
+                            mutate(hetero_dummy = 
+                                     case_when(is.na(mean(unique(df[df$tempo == baseline, ][[var]]), na.rm =  TRUE)) ~ last(hetero_dummy, order_by = tempo), # Nos casos em que a variável não possui dados na linha de base, mesmo sendo painel, usamos os dados do grupo de controle no tempo == 1
+                                               .default = first(hetero_dummy, order_by = tempo)), # substituindo variável pelo seu valor no tempo 0 
+                                   tratamento_recebido = last(tratamento_recebido, order_by = tempo)) %>%    # substituindo variável pelo seu valor no tempo 2
                             ungroup()
                         }
                         
@@ -274,7 +307,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                           filter(painel_balanceado == 1)
                         
                         # Gerando pesos do IPW
-                        if (tipo_metodo == "IPW - manual" & t > 0) { # não rodando quando a variável só tem missings
+                        if (tipo_metodo == "IPW - manual" & t > 0) { 
                           
                           # Criando variável de atrito por variável de resultado
                           df <- df %>%
@@ -307,7 +340,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                             mutate(psweight = 1 / phat) %>%   # Ou seja, quanto maior a probabilidade da pessoa atritar maior o seu peso. Assim, pessoas que tinham altas chances de atritar e não atritaram ficam com mais peso na amostra
                             reframe(id, psweight)
                           
-                          df     <- left_join(df, df_t0, by = "id")#, relationship = "many-to-one")
+                          df     <- left_join(df, df_t0, by = "id")
                           df_did <- left_join(df_did, df_t0, by = "id")
                           
                           # Definindo pesos
@@ -315,8 +348,10 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                           weight     = df$psweight[df$tempo == t]
                           weight_did = df_did$psweight
                         }
-                        #if (tipo_metodo != "IPW - manual" | nrow(df[(df$tempo == baseline) & !is.na(df$var_resultado), ]) == 0) {
                         else {
+                          df$psweight     = 1
+                          df_did$psweight = 1
+                          
                           weight = NULL
                           weight_did = NULL
                         }
@@ -331,7 +366,6 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         ## caso 1: se é VERDADEIRO que, sendo Lee Bounds, a variável NÂO tem observações válidas na linha de base
                         if (tipo_metodo %in% c("Lee Bounds - Upper", "Lee Bounds - Lower") &
                             length(unique(df[!is.na(df[[var]]), ]$tempo)) < 2) {
-                          
                           condicao_1 = 1
                         }
                         else {
@@ -350,11 +384,11 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                         
                         # Rodando modelos
                         
-                        if (condicao_1 + condicao_2 == 0) { 
+                        if (condicao_1 + condicao_2  == 0) { 
                           
                           if (tipo_regressao == "Diferença de Médias") {
                             if (tipo_estimador == "ITT") {
-                              if(tipo_controle == "não"){
+                              if(tipo_controle == "não"){ 
                                 model <- lm(df[[var]][tempo == t] ~ df$tratamento_sorteado[tempo == t] + df$tratamento_dummy_sorteado[tempo == baseline] + df$hetero_dummy[tempo == baseline] + df$estrato_definido[tempo == baseline], data = df, weights = weight)
                               }
                               if(tipo_controle == "sim"){
@@ -435,7 +469,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                                 efeito = case_when(medida == "múltiplos do desvio padrão" ~ efeito / desvio_padrao_controle_baseline,
                                                    medida == "pontos percentuais" ~ efeito),
                                 erro_padrao = case_when(medida == "múltiplos do desvio padrão" ~ erro_padrao / desvio_padrao_controle_baseline,
-                                                   medida == "pontos percentuais" ~ erro_padrao),
+                                                        medida == "pontos percentuais" ~ erro_padrao),
                                 ic_baixo = efeito - qt(0.95, n_obs - 1) * erro_padrao,
                                 ic_cima  = efeito + qt(0.95, n_obs - 1) * erro_padrao
                               )
