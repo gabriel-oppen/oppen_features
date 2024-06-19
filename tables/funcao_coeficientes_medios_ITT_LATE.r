@@ -51,7 +51,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
   }
   
   # Apendando variável "não" à lista de variáveis heterogênas
-  var_heterogeneo <- c("abaixo_p25","abaixo_p50", "acima_p75", "não", var_heterogeneo)
+  var_heterogeneo <- c("abaixo_p50", "abaixo_p25", "acima_p75", "não", var_heterogeneo)
   
   # Definindo variável de tratamento efetivo
   var_tratamento_recebido <- c(var_tratamento_recebido, "não")
@@ -72,7 +72,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
   vars_controle_ipw <- paste(controles_ipw, collapse = " + ")
   
   dados_final <- data.frame() # dataframe vazio para armazenar resultados do loop
-  for (tipo_metodo in c("IPW - manual","Lee Bounds - Upper","Lee Bounds - Lower","Nenhum")) { 
+  for (tipo_metodo in c("Nenhum","IPW - manual","Lee Bounds - Upper","Lee Bounds - Lower")) { 
     for (t in unique(dados$tempo)) {
       
       for (i in seq_along(vars_resultado)) {
@@ -92,6 +92,7 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                     for(tipo_estrato in c("não", "sim")) {
                       
                       for(medida in c("múltiplos do desvio padrão", "pontos percentuais")) {
+                        
                         
                         # Definindo parâmetros do loop
                         var              <- vars_resultado[i]
@@ -222,9 +223,9 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                           q1 <- quantile(df[(df$tempo == t) & (df[[var_tratamento_sorteado]] == 0), ]$var_resultado, probs = 0.25, na.rm = TRUE)
                           q2 <- quantile(df[(df$tempo == t) & (df[[var_tratamento_sorteado]] == 0), ]$var_resultado, probs = 0.50, na.rm = TRUE)                          
                           q3 <- quantile(df[(df$tempo == t) & (df[[var_tratamento_sorteado]] == 0), ]$var_resultado, probs = 0.75, na.rm = TRUE)
-                          df$abaixo_p25 <- ifelse(df$var_resultado < q1, 1, 0)
-                          df$abaixo_p50 <- ifelse(df$var_resultado < q2, 1, 0)
-                          df$acima_p75  <- ifelse(df$var_resultado > q3, 1, 0)
+                          df$abaixo_p25 <- ifelse(df$var_resultado <= q1, 1, 0)
+                          df$abaixo_p50 <- ifelse(df$var_resultado <= q2, 1, 0)
+                          df$acima_p75  <- ifelse(df$var_resultado >= q3, 1, 0)
                         }
                         else { # quando é painel
                           
@@ -236,13 +237,13 @@ f_oppen_estima_ITT_LATE     <- function(dados,
                           df <- df %>% 
                             mutate(
                               abaixo_p25 = case_when(
-                                (var_resultado < q1 & tempo == baseline) ~ 1,
-                                (var_resultado >= q1 & tempo == baseline) ~ 0,
+                                (var_resultado <= q1 & tempo == baseline) ~ 1,
+                                (var_resultado > q1 & tempo == baseline) ~ 0,
                                 .default = NA_real_),
                               
                               abaixo_p50 = case_when(
-                                (var_resultado < q2 & tempo == baseline) ~ 1,
-                                (var_resultado >= q2 & tempo == baseline) ~ 0,
+                                (var_resultado <= q2 & tempo == baseline) ~ 1,
+                                (var_resultado > q2 & tempo == baseline) ~ 0,
                                 .default = NA_real_),
                               
                               acima_p75 = case_when(
