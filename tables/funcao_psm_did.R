@@ -15,7 +15,9 @@ f_oppen_psm_did     <- function(dados,                          # base de dados
                                 vars_resultado,                 # variáveis de resultado (indicadores)
                                 #var_tratamento,                # variável que indica alocação do tratamento
                                 var_intervencao,                # variável que indica a modalidade da intervenção
-                                lista_tipos_intervencao,        # lista dos tipos de intervenção (municipal, regional, município X, etc)
+                                #lista_tipos_intervencao,        # lista dos tipos de intervenção (municipal, regional, município X, etc)
+                                lista_tipos_intervencao_media,
+                                lista_tipos_intervencao_inferior,
                                 output_path,                    # diretório a ser salvo o arquivo
                                 nome_arquivo                    # nome do arquivo criado
 ) {
@@ -31,8 +33,11 @@ f_oppen_psm_did     <- function(dados,                          # base de dados
   dados_output_2.1 <- data.table() 
   dados_output_2.2 <- data.table() 
   
+  # Criando lista de todos os tipos de intervenção
+  lista_tipos_intervencao_todas <- c(lista_tipos_intervencao_media, lista_tipos_intervencao_inferior)
+  
   # Loops
-  for(ti in seq_along(lista_tipos_intervencao)) { # loop do tipo de intervenção
+  for(ti in seq_along(lista_tipos_intervencao_todas)) { # loop do tipo de intervenção
     for (vr in seq_along(vars_resultado)) {     # loop de variáveis de resultado
       for (metodo in c("glm", "mahalanobis")) {
         for (tipo_reposicao in c("sem reposição")) {
@@ -40,13 +45,13 @@ f_oppen_psm_did     <- function(dados,                          # base de dados
             for(pacote in c("MatchIt")){ # loop do pacote usado (depois incluir "MatchingFrontier")
               
               # Definindo valores do loop
-              tipos_intervencao_loop      <- as.character(lista_tipos_intervencao[ti])
+              tipos_intervencao_loop      <- as.character(lista_tipos_intervencao_todas[ti])
               vars_resultado_loop         <- as.character(vars_resultado[vr])
               tipo_reposicao_loop         <- ifelse(tipo_reposicao == "sem reposição", FALSE, TRUE)
               
               # Mantendo apenas municípios de um tipo de intervenção e o pool de municípios de controle
               
-              if(tipos_intervencao_loop %in% c("regional","municipal")) {
+              if(tipos_intervencao_loop %in% lista_tipos_intervencao_media) {
                 df <- dados[dados$var_intervencao %in% c(NA, "controle", tipos_intervencao_loop), ]
               }
               
@@ -59,8 +64,8 @@ f_oppen_psm_did     <- function(dados,                          # base de dados
               }
               
               # Gerando variável dummy de tratamento
-              df[, tratamento := fcase((tipos_intervencao_loop %in% c("regional","municipal")) & (var_intervencao == tipos_intervencao_loop), 1,
-                                       (tipos_intervencao_loop %in% c("regional","municipal")) & (var_intervencao != tipos_intervencao_loop), 0,
+              df[, tratamento := fcase((tipos_intervencao_loop %in% lista_tipos_intervencao_media) & (var_intervencao == tipos_intervencao_loop), 1,
+                                       (tipos_intervencao_loop %in% lista_tipos_intervencao_media) & (var_intervencao != tipos_intervencao_loop), 0,
                                        (tipos_intervencao_loop %in% unique(id_municipio)) & (id_municipio == tipos_intervencao_loop), 1,
                                        (tipos_intervencao_loop %in% unique(id_municipio)) & (id_municipio != tipos_intervencao_loop), 0,
                                        (tipos_intervencao_loop %in% unique(id_consorcio)) & (id_consorcio == tipos_intervencao_loop), 1,
@@ -95,16 +100,9 @@ f_oppen_psm_did     <- function(dados,                          # base de dados
               
               # Adicionando variáveis do loop
               df_matching[, var_intervencao := tipos_intervencao_loop]
-              #df_matching[, matching_n_vizinhos := n_vizinhos]
-              #df_matching[, matching_tipo := pacote]
-              #df_matching[, matching_metodo := metodo]
               df_matching[, modelo := paste0(pacote, " - ", metodo, " - ", n_vizinhos," vizinhos", " - ", tipo_reposicao)]
-              
               df_matching[metodo == "mahalanobis", matching_score := NA_real_] # Como mahalanobis não calculos PSM, atribuímos um valor missing
               
-              # Removendo variáveis não necessárias
-              #df_matching[, matching_tipo := NULL]
-              #df_matching[, matching_metodo := NULL]
               
               #  # Criando Figura 2.4 (Suporte Comum)
               #  # Gráfico 1: Antes do Pareamento (usando todas as observações)
@@ -159,9 +157,6 @@ f_oppen_psm_did     <- function(dados,                          # base de dados
                   output_2.2[, nobs := nobs(modelo_balanceamento)]
                   output_2.2[, momento := momento]
                   output_2.2[, var_intervencao := tipos_intervencao_loop]
-                  #output_2.2[, matching_n_vizinhos := n_vizinhos]
-                  #output_2.2[, matching_tipo := pacote]
-                  #output_2.2[, matching_metodo := metodo]
                   output_2.2[, modelo := paste0(pacote, " - ", metodo, " - ", n_vizinhos, " vizinhos", " - ", tipo_reposicao)]
                   ## salvando
                   dados_output_2.2 <- rbindlist(list(dados_output_2.2, output_2.2), use.names = TRUE)
